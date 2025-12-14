@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Đầu Tiên Của Tôi</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-rocket"></i> Chào Mừng Đến Vercel!</h1>
+            <p class="subtitle">Website đầu tiên được deploy lên Vercel</p>
+        </header>
+        
+        <main>
+            <section class="card">
+                <h2><i class="fas fa-info-circle"></i> Thông Tin Website</h2>
+                <p>Đây là website tĩnh đơn giản gồm:</p>
+                <ul>
+                    <li><i class="fas fa-check-circle"></i> HTML - Cấu trúc trang</li>
+                    <li><i class="fas fa-check-circle"></i> CSS - Thiết kế giao diện</li>
+                    <li><i class="fas fa-check-circle"></i> JavaScript - Tương tác</li>
+                </ul>
+            </section>
+            
+            <section class="card">
+                <h2><i class="fas fa-magic"></i> Tính Năng Thú Vị</h2>
+                <p>Nhấn vào nút bên dưới để xem magic!</p>
+                <button id="magic-button" class="btn">
+                    <i class="fas fa-wand-magic-sparkles"></i> Bấm vào tôi!
+                </button>
+                <div id="message" class="message"></div>
+            </section>
+            
+            <section class="card">
+                <h2><i class="fas fa-history"></i> Bạn Đã Học</h2>
+                <p>Bạn đã thành công với:</p>
+                <div class="badges">
+                    <span class="badge">HTML</span>
+                    <span class="badge">CSS</span>
+                    <span class="badge">JavaScript</span>
+                    <span class="badge">IIS</span>
+                    <span class="badge">Windows Server</span>
+                    <span class="badge">HTTPS/SSL</span>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Deploy bằng <i class="fas fa-heart"></i> và <strong>Vercel</strong></p>
+            <p id="visit-count">Số lần truy cập: Đang tải...</p>
+            <p class="time" id="current-time"></p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
