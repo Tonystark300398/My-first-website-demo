@@ -74,4 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 5. Chào mừng khi vào trang
     console.log('🎊 Website của bạn đã sẵn sàng!');
     console.log('👉 Mở file index.html trên trình duyệt để xem');
+	// Thêm vào script.js
+	fetch('/api/visitor')
+  		.then(response => response.json())
+  		.then(data => {
+    		 document.getElementById('visit-count').innerHTML = 
+      		  `<i class="fas fa-eye"></i> Số lượt xem: <strong>${data.visits}</strong>`;
+  });
 });
