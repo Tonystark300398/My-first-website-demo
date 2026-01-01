@@ -1,8 +1,8 @@
-// Stark Video AI - Script chính
+// Stark Video AI - Main Script
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Stark Video AI đã sẵn sàng!');
+    console.log('🚀 Stark Video AI is ready!');
     
-    // ==================== KHỞI TẠO BIẾN ====================
+    // ==================== INITIALIZE VARIABLES ====================
     let currentVideoUrl = null;
     let isGenerating = false;
     let generationTimer = null;
@@ -11,14 +11,14 @@ document.addEventListener('DOMContentLoaded', function() {
     initApp();
     
     function initApp() {
-        // 1. Khởi tạo thời gian thực
+        // 1. Initialize real-time
         updateRealTime();
         setInterval(updateRealTime, 1000);
         
-        // 2. Khởi tạo visit counter
+        // 2. Initialize visit counter
         initializeVisitCounter();
         
-        // 3. Khởi tạo character counter
+        // 3. Initialize character counter
         initializeCharCounter();
         
         // 4. Setup event listeners
@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', function() {
             timeZone: 'Asia/Ho_Chi_Minh'
         };
         
-        const timeString = now.toLocaleTimeString('vi-VN');
-        const dateString = now.toLocaleDateString('vi-VN', options);
+        const timeString = now.toLocaleTimeString('en-US');
+        const dateString = now.toLocaleDateString('en-US', options);
         
         // Update footer time
         const timeElement = document.getElementById('current-time');
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             let visits = localStorage.getItem('starkVisits');
             if (!visits) {
-                visits = Math.floor(Math.random() * 10000) + 12000; // Start with realistic number
+                visits = Math.floor(Math.random() * 10000) + 12000;
                 localStorage.setItem('starkVisits', visits);
             } else {
                 visits = parseInt(visits);
@@ -69,14 +69,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Format number with commas
-            const formattedVisits = visits.toLocaleString('vi-VN');
+            const formattedVisits = visits.toLocaleString('en-US');
             document.getElementById('visit-count').innerHTML = 
-                `<i class="fas fa-users"></i> ${formattedVisits} người đang sử dụng`;
+                `<i class="fas fa-users"></i> ${formattedVisits} active users`;
                 
         } catch (error) {
-            console.error('Lỗi khi khởi tạo visit counter:', error);
+            console.error('Error initializing visit counter:', error);
             document.getElementById('visit-count').innerHTML = 
-                `<i class="fas fa-users"></i> 12,458 người đang sử dụng`;
+                `<i class="fas fa-users"></i> 12,458 active users`;
         }
     }
     
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tryFreeBtn = document.getElementById('try-free-btn');
         if (tryFreeBtn) {
             tryFreeBtn.addEventListener('click', () => {
-                showNotification('Bắt đầu dùng thử miễn phí!', 'success');
+                showNotification('Starting free trial!', 'success');
                 document.getElementById('video-prompt').focus();
             });
         }
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const signupBtn = document.getElementById('signup-btn');
         if (signupBtn) {
             signupBtn.addEventListener('click', () => {
-                showModal('Đăng ký', 'Tính năng đăng ký đang được phát triển. Quay lại sau nhé!', 'info');
+                showModal('Sign Up', 'Sign up feature is under development. Please check back later!', 'info');
             });
         }
         
@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const loginBtn = document.getElementById('login-btn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => {
-                showModal('Đăng nhập', 'Tính năng đăng nhập đang được phát triển. Quay lại sau nhé!', 'info');
+                showModal('Sign In', 'Sign in feature is under development. Please check back later!', 'info');
             });
         }
         
@@ -191,11 +191,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupExamplePrompts() {
         const promptInput = document.getElementById('video-prompt');
         const examplePrompts = [
-            "Một chú gấu trúc đang ăn trúc trên núi vào buổi sáng sớm với ánh mặt trời chiếu xuyên qua sương mù",
-            "Thành phố tương lai với những tòa nhà chọc trời, xe bay và người máy di chuyển trên đường phố",
-            "Cảnh biển hoàng hôn với sóng vỗ nhẹ, bãi cát vàng và những con chim hải âu bay lượn",
-            "Khu rừng nhiệt đới với thác nước lớn, động vật hoang dã và cây cối tươi tốt",
-            "Buổi trình diễn pháo hoa đêm giao thừa tại Tokyo với đông đảo người xem"
+            "A panda eating bamboo on a mountain in the early morning with sunlight shining through mist",
+            "Future city with skyscrapers, flying cars and robots moving on the streets",
+            "Sunset beach scene with gentle waves, golden sand and seagulls flying",
+            "Tropical rainforest with large waterfall, wildlife and lush vegetation",
+            "New Year's Eve fireworks display in Tokyo with large crowds"
         ];
         
         // Add clickable examples
@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 exampleBtn.addEventListener('click', () => {
                     promptInput.value = prompt;
                     promptInput.dispatchEvent(new Event('input'));
-                    showNotification(`Đã áp dụng ví dụ ${index + 1}`, 'info');
+                    showNotification(`Applied example ${index + 1}`, 'info');
                 });
                 examplesSection.appendChild(exampleBtn);
             });
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     async function generateVideo() {
         if (isGenerating) {
-            showNotification('Đang tạo video, vui lòng chờ...', 'warning');
+            showNotification('Generating video, please wait...', 'warning');
             return;
         }
         
@@ -226,13 +226,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const prompt = promptInput.value.trim();
         
         if (!prompt) {
-            showNotification('Vui lòng nhập mô tả video!', 'error');
+            showNotification('Please enter video description!', 'error');
             promptInput.focus();
             return;
         }
         
         if (prompt.length < 10) {
-            showNotification('Mô tả quá ngắn. Vui lòng nhập ít nhất 10 ký tự!', 'error');
+            showNotification('Description too short. Please enter at least 10 characters!', 'error');
             return;
         }
         
@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Disable generate button
         const generateBtn = document.getElementById('generate-btn');
         generateBtn.disabled = true;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang tạo...';
+        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
         
         // Show progress container
         const progressContainer = document.getElementById('progress-container');
@@ -269,10 +269,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let progress = 0;
         const steps = [
-            {name: 'Phân tích văn bản', duration: 1000},
-            {name: 'AI đang tạo hình ảnh', duration: 2000},
-            {name: 'Tạo chuyển động video', duration: 3000},
-            {name: 'Thêm âm thanh & hoàn thiện', duration: 2000}
+            {name: 'Text Analysis', duration: 1000},
+            {name: 'AI Generating Images', duration: 2000},
+            {name: 'Creating Video Motion', duration: 3000},
+            {name: 'Adding Sound & Finalizing', duration: 2000}
         ];
         
         // Update steps visually
@@ -340,10 +340,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset generate button
         const generateBtn = document.getElementById('generate-btn');
         generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Tạo Video với Stark AI';
+        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
         
         // Show success notification
-        showNotification('🎉 Video đã được tạo thành công!', 'success');
+        showNotification('🎉 Video generated successfully!', 'success');
         
         // Play video automatically
         setTimeout(() => {
@@ -367,12 +367,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function getStyleName(styleValue) {
         const styles = {
-            realistic: 'Thực tế',
+            realistic: 'Realistic',
             anime: 'Anime',
-            cinematic: 'Điện ảnh',
+            cinematic: 'Cinematic',
             '3d-animation': '3D Animation',
-            artistic: 'Nghệ thuật',
-            cartoon: 'Hoạt hình'
+            artistic: 'Artistic',
+            cartoon: 'Cartoon'
         };
         
         return styles[styleValue] || styleValue;
@@ -393,15 +393,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== VIDEO ACTIONS ====================
     function downloadVideo() {
         if (!currentVideoUrl) {
-            showNotification('Không có video để tải xuống!', 'error');
+            showNotification('No video to download!', 'error');
             return;
         }
         
-        showNotification('Đang tải video xuống...', 'info');
+        showNotification('Downloading video...', 'info');
         
         // Simulate download
         setTimeout(() => {
-            showNotification('✅ Video đã được tải xuống!', 'success');
+            showNotification('✅ Video downloaded successfully!', 'success');
             
             // Track download in analytics
             trackEvent('video_download');
@@ -410,13 +410,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function shareVideo() {
         if (!currentVideoUrl) {
-            showNotification('Không có video để chia sẻ!', 'error');
+            showNotification('No video to share!', 'error');
             return;
         }
         
         // Create share modal
         showModal(
-            'Chia sẻ video',
+            'Share Video',
             `
             <div class="share-options">
                 <button class="share-option" onclick="shareToFacebook()">
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="share-link">
                     <input type="text" readonly value="${window.location.origin}/video/123" id="share-url">
                     <button onclick="copyShareLink()">
-                        <i class="fas fa-copy"></i> Sao chép
+                        <i class="fas fa-copy"></i> Copy
                     </button>
                 </div>
             </div>
@@ -503,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div class="modal-body">${content}</div>
                     <div class="modal-footer">
-                        <button class="btn btn-secondary modal-close-btn">Đóng</button>
+                        <button class="btn btn-secondary modal-close-btn">Close</button>
                     </div>
                 </div>
             `;
@@ -592,7 +592,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
         } catch (error) {
-            console.error('Lỗi khi lưu lịch sử:', error);
+            console.error('Error saving history:', error);
         }
     }
     
@@ -621,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
         } catch (error) {
-            console.error('Lỗi khi tải preferences:', error);
+            console.error('Error loading preferences:', error);
         }
     }
     
@@ -647,9 +647,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         console.log('📊 Analytics Event:', analytics);
-        
-        // In production, you would send this to your analytics service
-        // Example: fetch('/api/analytics', { method: 'POST', body: JSON.stringify(analytics) });
     }
     
     // ==================== WINDOW EVENTS ====================
@@ -662,15 +659,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ==================== GLOBAL FUNCTIONS (for modal) ====================
     window.shareToFacebook = function() {
-        showNotification('Chia sẻ lên Facebook (demo)', 'info');
+        showNotification('Sharing to Facebook (demo)', 'info');
     };
     
     window.shareToTwitter = function() {
-        showNotification('Chia sẻ lên Twitter (demo)', 'info');
+        showNotification('Sharing to Twitter (demo)', 'info');
     };
     
     window.shareToLinkedIn = function() {
-        showNotification('Chia sẻ lên LinkedIn (demo)', 'info');
+        showNotification('Sharing to LinkedIn (demo)', 'info');
     };
     
     window.copyShareLink = function() {
@@ -680,10 +677,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         navigator.clipboard.writeText(shareUrl.value)
             .then(() => {
-                showNotification('Đã sao chép link vào clipboard!', 'success');
+                showNotification('Link copied to clipboard!', 'success');
             })
             .catch(err => {
-                showNotification('Lỗi khi sao chép: ' + err, 'error');
+                showNotification('Error copying: ' + err, 'error');
             });
     };
     
