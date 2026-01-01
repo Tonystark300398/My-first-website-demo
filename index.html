@@ -3,58 +3,392 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Đầu Tiên Của Tôi</title>
+    <title>Stark Video AI - Tạo Video AI Chuyên Nghiệp</title>
+    <meta name="description" content="Tạo video AI chất lượng cao với công nghệ tiên tiến từ Stark. Chuyển đổi văn bản thành video trong vài giây.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="https://img.icons8.com/color/96/000000/video.png">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-rocket"></i> Chào Mừng Đến Vercel!</h1>
-            <p class="subtitle">Website đầu tiên được deploy lên Vercel</p>
-        </header>
-        
-        <main>
-            <section class="card">
-                <h2><i class="fas fa-info-circle"></i> Thông Tin Website</h2>
-                <p>Đây là website tĩnh đơn giản gồm:</p>
-                <ul>
-                    <li><i class="fas fa-check-circle"></i> HTML - Cấu trúc trang</li>
-                    <li><i class="fas fa-check-circle"></i> CSS - Thiết kế giao diện</li>
-                    <li><i class="fas fa-check-circle"></i> JavaScript - Tương tác</li>
-                </ul>
-            </section>
-            
-            <section class="card">
-                <h2><i class="fas fa-magic"></i> Tính Năng Thú Vị</h2>
-                <p>Nhấn vào nút bên dưới để xem magic!</p>
-                <button id="magic-button" class="btn">
-                    <i class="fas fa-wand-magic-sparkles"></i> Bấm vào tôi!
-                </button>
-                <div id="message" class="message"></div>
-            </section>
-            
-            <section class="card">
-                <h2><i class="fas fa-history"></i> Bạn Đã Học</h2>
-                <p>Bạn đã thành công với:</p>
-                <div class="badges">
-                    <span class="badge">HTML</span>
-                    <span class="badge">CSS</span>
-                    <span class="badge">JavaScript</span>
-                    <span class="badge">IIS</span>
-                    <span class="badge">Windows Server</span>
-                    <span class="badge">HTTPS/SSL</span>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <div class="logo">
+                    <i class="fas fa-bolt"></i>
+                    <span>STARK</span>
                 </div>
-            </section>
-        </main>
-        
-        <footer>
-            <p>Deploy bằng <i class="fas fa-heart"></i> và <strong>Vercel</strong></p>
-            <p id="visit-count">Số lần truy cập: Đang tải...</p>
-            <p class="time" id="current-time"></p>
-        </footer>
+                <div class="brand-subtitle">Video AI</div>
+            </div>
+            
+            <ul class="nav-links">
+                <li><a href="#home" class="active">Trang chủ</a></li>
+                <li><a href="#features">Tính năng</a></li>
+                <li><a href="#how-it-works">Cách hoạt động</a></li>
+                <li><a href="#examples">Ví dụ</a></li>
+                <li><a href="#pricing">Bảng giá</a></li>
+            </ul>
+            
+            <div class="nav-actions">
+                <button class="btn btn-outline" id="login-btn">
+                    <i class="fas fa-sign-in-alt"></i> Đăng nhập
+                </button>
+                <button class="btn btn-primary" id="try-free-btn">
+                    <i class="fas fa-play-circle"></i> Dùng thử miễn phí
+                </button>
+            </div>
+            
+            <button class="mobile-menu-btn" id="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-container">
+            <div class="hero-content">
+                <div class="badge">
+                    <i class="fas fa-bolt"></i> CÔNG NGHỆ AI HÀNG ĐẦU
+                </div>
+                <h1 class="hero-title">Tạo Video <span class="gradient-text">Sống Động</span> Từ Văn Bản</h1>
+                <p class="hero-subtitle">Stark Video AI biến ý tưởng của bạn thành những video chất lượng cao với công nghệ AI tiên tiến. Chỉ cần nhập mô tả và chờ đợi điều kỳ diệu.</p>
+                
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-number">10,000+</div>
+                        <div class="stat-label">Video đã tạo</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">99%</div>
+                        <div class="stat-label">Độ hài lòng</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">30s</div>
+                        <div class="stat-label">Thời gian tạo</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero-video-preview">
+                <div class="video-placeholder">
+                    <div class="video-player">
+                        <div class="play-btn">
+                            <i class="fas fa-play"></i>
+                        </div>
+                        <div class="video-title">Video được tạo bởi Stark AI</div>
+                        <div class="video-overlay">
+                            <div class="loading-animation">
+                                <div class="spinner"></div>
+                                <p>AI đang xử lý...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Video Generator Section -->
+    <section class="generator-section">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-wand-magic-sparkles"></i> Tạo Video Ngay Bây Giờ</h2>
+                <p>Nhập mô tả chi tiết để AI tạo video cho bạn</p>
+            </div>
+            
+            <div class="generator-container">
+                <div class="input-section">
+                    <div class="input-header">
+                        <h3><i class="fas fa-keyboard"></i> Mô tả video của bạn</h3>
+                        <div class="char-count" id="char-count">0/500</div>
+                    </div>
+                    
+                    <textarea 
+                        id="video-prompt" 
+                        class="prompt-input" 
+                        placeholder="Ví dụ: Một chú gấu trúc đang ăn trúc trên núi vào buổi sáng sớm với ánh mặt trời chiếu xuyên qua sương mù, phong cảnh thiên nhiên tươi đẹp..."
+                        maxlength="500"
+                    ></textarea>
+                    
+                    <div class="input-options">
+                        <div class="option-group">
+                            <label for="video-style"><i class="fas fa-palette"></i> Phong cách video</label>
+                            <select id="video-style" class="style-select">
+                                <option value="realistic">Thực tế</option>
+                                <option value="anime">Anime</option>
+                                <option value="cinematic">Điện ảnh</option>
+                                <option value="3d-animation">3D Animation</option>
+                                <option value="artistic">Nghệ thuật</option>
+                                <option value="cartoon">Hoạt hình</option>
+                            </select>
+                        </div>
+                        
+                        <div class="option-group">
+                            <label for="video-length"><i class="fas fa-clock"></i> Độ dài video</label>
+                            <select id="video-length" class="length-select">
+                                <option value="5">5 giây</option>
+                                <option value="10">10 giây</option>
+                                <option value="15">15 giây</option>
+                                <option value="20">20 giây</option>
+                                <option value="30">30 giây</option>
+                            </select>
+                        </div>
+                        
+                        <div class="option-group">
+                            <label for="aspect-ratio"><i class="fas fa-expand"></i> Tỷ lệ khung hình</label>
+                            <select id="aspect-ratio" class="ratio-select">
+                                <option value="16:9">16:9 (Widescreen)</option>
+                                <option value="9:16">9:16 (Dọc)</option>
+                                <option value="1:1">1:1 (Vuông)</option>
+                                <option value="4:5">4:5 (Instagram)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-generate" id="generate-btn">
+                        <i class="fas fa-bolt"></i> Tạo Video với Stark AI
+                    </button>
+                    
+                    <div class="disclaimer">
+                        <i class="fas fa-info-circle"></i> Bằng cách nhấn tạo video, bạn đồng ý với <a href="#">Điều khoản sử dụng</a> và xác nhận nội dung tuân thủ <a href="#">Chính sách nội dung</a>.
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <div class="output-header">
+                        <h3><i class="fas fa-video"></i> Video của bạn</h3>
+                        <div class="output-actions">
+                            <button class="btn-icon" id="download-btn" disabled>
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button class="btn-icon" id="share-btn" disabled>
+                                <i class="fas fa-share"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="video-output" id="video-output">
+                        <div class="output-placeholder">
+                            <div class="placeholder-icon">
+                                <i class="fas fa-film"></i>
+                            </div>
+                            <h4>Video sẽ xuất hiện ở đây</h4>
+                            <p>Nhập mô tả và nhấn "Tạo Video" để bắt đầu</p>
+                        </div>
+                        
+                        <div class="generation-progress" id="progress-container">
+                            <div class="progress-header">
+                                <h4>Đang tạo video với Stark AI</h4>
+                                <div class="progress-percent" id="progress-percent">0%</div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <div class="progress-steps">
+                                <div class="step active"><i class="fas fa-font"></i> Phân tích văn bản</div>
+                                <div class="step"><i class="fas fa-brain"></i> AI đang tạo hình ảnh</div>
+                                <div class="step"><i class="fas fa-play-circle"></i> Tạo chuyển động video</div>
+                                <div class="step"><i class="fas fa-music"></i> Thêm âm thanh & hoàn thiện</div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-result" id="video-result">
+                            <video controls id="generated-video">
+                                <source src="" type="video/mp4">
+                                Trình duyệt của bạn không hỗ trợ video tag.
+                            </video>
+                            <div class="video-info">
+                                <h4 id="video-title">Video đã tạo</h4>
+                                <div class="video-details">
+                                    <span><i class="fas fa-clock"></i> <span id="video-duration">10s</span></span>
+                                    <span><i class="fas fa-palette"></i> <span id="video-style-result">Thực tế</span></span>
+                                    <span><i class="fas fa-expand"></i> <span id="video-ratio">16:9</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-star"></i> Công Nghệ Vượt Trội Của Stark</h2>
+                <p>Khám phá những tính năng đột phá giúp Stark tạo video AI tốt nhất</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h3>Tốc độ siêu nhanh</h3>
+                    <p>Tạo video chỉ trong 30-60 giây với công nghệ AI tối ưu hóa, nhanh hơn 3x so với các nền tảng khác.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <h3>Chất lượng 4K</h3>
+                    <p>Video được tạo với độ phân giải lên đến 4K, hình ảnh sắc nét, chuyển động mượt mà và chân thực.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-language"></i>
+                    </div>
+                    <h3>Hỗ trợ đa ngôn ngữ</h3>
+                    <p>Hiểu và tạo video từ mô tả bằng tiếng Việt, Anh, Trung, Nhật và 20+ ngôn ngữ khác.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <h3>Tùy chỉnh nâng cao</h3>
+                    <p>Kiểm soát chi tiết từ phong cách, tỷ lệ khung hình, chuyển động camera đến nhạc nền.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-cogs"></i> Cách Stark Hoạt Động</h2>
+                <p>Quy trình 4 bước đơn giản để tạo video AI chất lượng cao</p>
+            </div>
+            
+            <div class="steps-container">
+                <div class="step-item">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Nhập mô tả</h3>
+                        <p>Mô tả chi tiết nội dung video bạn muốn tạo. Càng chi tiết, video càng chính xác.</p>
+                    </div>
+                </div>
+                
+                <div class="step-item">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>AI phân tích</h3>
+                        <p>Stark AI phân tích ngữ cảnh, đối tượng, hành động và bối cảnh từ mô tả của bạn.</p>
+                    </div>
+                </div>
+                
+                <div class="step-item">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Tạo hình ảnh & chuyển động</h3>
+                        <p>AI tạo hình ảnh chất lượng cao và áp dụng chuyển động tự nhiên cho từng khung hình.</p>
+                    </div>
+                </div>
+                
+                <div class="step-item">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>Hoàn thiện video</h3>
+                        <p>Thêm hiệu ứng, âm thanh, chỉnh màu và xuất video chất lượng cao sẵn sàng sử dụng.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Sẵn sàng tạo video AI đẳng cấp?</h2>
+                <p>Đăng ký ngay để nhận 5 video miễn phí mỗi tháng và trải nghiệm công nghệ AI tiên tiến nhất.</p>
+                <button class="btn btn-cta" id="signup-btn">
+                    <i class="fas fa-rocket"></i> Bắt đầu miễn phí
+                </button>
+                <p class="cta-note">Không cần thẻ tín dụng. Hủy bất kỳ lúc nào.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <i class="fas fa-bolt"></i>
+                        <span>STARK</span>
+                    </div>
+                    <div class="brand-subtitle">Video AI</div>
+                    <p class="footer-description">Công nghệ AI tiên tiến nhất để tạo video từ văn bản. Nhanh chóng, chất lượng, dễ sử dụng.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                        <a href="#"><i class="fab fa-youtube"></i></a>
+                        <a href="#"><i class="fab fa-github"></i></a>
+                    </div>
+                </div>
+                
+                <div class="footer-links">
+                    <div class="link-column">
+                        <h4>Sản phẩm</h4>
+                        <a href="#">Tính năng</a>
+                        <a href="#">Bảng giá</a>
+                        <a href="#">API cho nhà phát triển</a>
+                        <a href="#">Tải ứng dụng</a>
+                    </div>
+                    
+                    <div class="link-column">
+                        <h4>Tài nguyên</h4>
+                        <a href="#">Tài liệu hướng dẫn</a>
+                        <a href="#">Blog</a>
+                        <a href="#">Ví dụ video</a>
+                        <a href="#">Hỗ trợ</a>
+                    </div>
+                    
+                    <div class="link-column">
+                        <h4>Công ty</h4>
+                        <a href="#">Về chúng tôi</a>
+                        <a href="#">Việc làm</a>
+                        <a href="#">Liên hệ</a>
+                        <a href="#">Điều khoản sử dụng</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2023 Stark Video AI. Tất cả các quyền được bảo lưu.</p>
+                <div class="footer-stats">
+                    <span id="visit-count"><i class="fas fa-users"></i> 12,458 người đang sử dụng</span>
+                    <span id="current-time"><i class="fas fa-clock"></i> Đang tải thời gian...</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Video Modal -->
+    <div class="modal" id="video-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Video được tạo bởi Stark AI</h3>
+                <button class="close-modal" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <video controls id="modal-video">
+                    <source src="" type="video/mp4">
+                    Trình duyệt của bạn không hỗ trợ video tag.
+                </video>
+            </div>
+        </div>
     </div>
-    
+
     <script src="script.js"></script>
 </body>
 </html>
