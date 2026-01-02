@@ -734,3 +734,231 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
+// DOM Elements
+const videoPrompt = document.getElementById('video-prompt');
+const videoStyle = document.getElementById('video-style');
+const videoLength = document.getElementById('video-length');
+const aspectRatio = document.getElementById('aspect-ratio');
+const generateBtn = document.getElementById('generate-btn');
+const charCount = document.getElementById('char-count');
+const progressContainer = document.getElementById('progress-container');
+const progressFill = document.getElementById('progress-fill');
+const progressPercent = document.getElementById('progress-percent');
+const videoResult = document.getElementById('video-result');
+const generatedVideo = document.getElementById('generated-video');
+const videoTitle = document.getElementById('video-title');
+const videoDuration = document.getElementById('video-duration');
+const videoStyleResult = document.getElementById('video-style-result');
+const videoRatio = document.getElementById('video-ratio');
+const outputPlaceholder = document.querySelector('.output-placeholder');
+const downloadBtn = document.getElementById('download-btn');
+const shareBtn = document.getElementById('share-btn');
+
+// API Configuration
+const API_CONFIG = {
+    BASE_URL: 'https://58fhjfjqof.execute-api.ap-southeast-2.amazonaws.com/default/stark-video-generator', // Thay bằng URL API Gateway thực tế
+    ENDPOINT: '/generate-video',
+    API_KEY: 'YOUR_API_KEY', // Nếu cần xác thực
+    TIMEOUT: 300000 // 5 phút cho video generation
+};
+
+// Character counter
+videoPrompt.addEventListener('input', function() {
+    const count = this.value.length;
+    charCount.textContent = `${count}/500`;
+    charCount.style.color = count > 450 ? '#ff4757' : '#64748b';
+});
+
+// Generate Video Function
+async function generateVideo() {
+    // Get form values
+    const prompt = videoPrompt.value.trim();
+    const style = videoStyle.value;
+    const length = videoLength.value;
+    const ratio = aspectRatio.value;
+    
+    // Validation
+    if (!prompt) {
+        alert('Please enter a video description');
+        videoPrompt.focus();
+        return;
+    }
+    
+    if (prompt.length < 10) {
+        alert('Please provide a more detailed description (at least 10 characters)');
+        return;
+    }
+    
+    // Show progress UI
+    outputPlaceholder.style.display = 'none';
+    progressContainer.style.display = 'block';
+    videoResult.style.display = 'none';
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    
+    // Simulate progress steps
+    const steps = document.querySelectorAll('.progress-steps .step');
+    steps.forEach(step => step.classList.remove('active'));
+    
+    // Create request data
+    const requestData = {
+        prompt: prompt,
+        style: style,
+        length: parseInt(length),
+        aspect_ratio: ratio,
+        timestamp: new Date().toISOString(),
+        user_agent: navigator.userAgent
+    };
+    
+    console.log('Sending request:', requestData);
+    
+    try {
+        // Step 1: Send POST request to API
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINT}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': API_CONFIG.API_KEY, // Nếu cần
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(requestData),
+            signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('API Response:', data);
+        
+        // Simulate progress updates
+        simulateProgress(data);
+        
+        // Handle successful response
+        if (data.success && data.video_url) {
+            // Update UI with generated video
+            updateVideoResult(data);
+        } else {
+            throw new Error(data.message || 'Failed to generate video');
+        }
+        
+    } catch (error) {
+        console.error('Error generating video:', error);
+        handleGenerationError(error);
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
+    }
+}
+
+// Simulate progress animation
+function simulateProgress(apiData) {
+    let progress = 0;
+    const steps = document.querySelectorAll('.progress-steps .step');
+    
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 100) progress = 100;
+        
+        progressFill.style.width = `${progress}%`;
+        progressPercent.textContent = `${Math.round(progress)}%`;
+        
+        // Update steps based on progress
+        if (progress >= 25 && progress < 50) {
+            steps[0].classList.add('active');
+            steps[1].classList.add('active');
+        } else if (progress >= 50 && progress < 75) {
+            steps[2].classList.add('active');
+        } else if (progress >= 75) {
+            steps[3].classList.add('active');
+        }
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            // Switch to video result after a delay
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 1000);
+        }
+    }, 500);
+}
+
+// Update video result UI
+function updateVideoResult(data) {
+    // Update video player
+    generatedVideo.src = data.video_url || 'https://assets.mixkit.co/videos/preview/mixkit-tree-with-yellow-flowers-1173-large.mp4';
+    generatedVideo.load();
+    
+    // Update video info
+    videoTitle.textContent = data.title || 'Generated Video';
+    videoDuration.textContent = `${data.duration || videoLength.value}s`;
+    videoStyleResult.textContent = videoStyle.options[videoStyle.selectedIndex].text;
+    videoRatio.textContent = aspectRatio.options[aspectRatio.selectedIndex].text;
+    
+    // Show video result
+    setTimeout(() => {
+        videoResult.style.display = 'block';
+        downloadBtn.disabled = false;
+        shareBtn.disabled = false;
+        
+        // Set download link
+        downloadBtn.onclick = () => {
+            downloadVideo(data.video_url || generatedVideo.src);
+        };
+    }, 1500);
+}
+
+// Handle errors
+function handleGenerationError(error) {
+    progressContainer.style.display = 'none';
+    outputPlaceholder.style.display = 'block';
+    
+    const errorHTML = `
+        <div class="error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h4>Generation Failed</h4>
+            <p>${error.message || 'Please try again with a different description.'}</p>
+            <button class="btn btn-outline" onclick="retryGeneration()">Retry</button>
+        </div>
+    `;
+    
+    outputPlaceholder.innerHTML = errorHTML;
+}
+
+// Download video
+function downloadVideo(url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stark-video-${Date.now()}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+// Retry function
+function retryGeneration() {
+    outputPlaceholder.innerHTML = `
+        <div class="placeholder-icon">
+            <i class="fas fa-film"></i>
+        </div>
+        <h4>Your Video Will Appear Here</h4>
+        <p>Enter description and click "Generate Video" to start</p>
+    `;
+    generateVideo();
+}
+
+// Event Listeners
+generateBtn.addEventListener('click', generateVideo);
+
+// Enter key to generate
+videoPrompt.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'Enter') {
+        generateVideo();
+    }
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Stark Video AI initialized');
+});

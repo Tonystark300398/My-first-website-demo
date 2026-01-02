@@ -1557,3 +1557,153 @@ video {
     overflow-wrap: break-word;
     word-break: break-word;
 }
+/* Progress Container */
+.generation-progress {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 20px 0;
+    display: none;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.progress-header h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #f8fafc;
+}
+
+.progress-percent {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #334155;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 25px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.step {
+    text-align: center;
+    padding: 15px 10px;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.step i {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #94a3b8;
+}
+
+.step.active i {
+    color: #667eea;
+}
+
+/* Error Message */
+.error-message {
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(220, 38, 38, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.error-message i {
+    font-size: 3rem;
+    color: #ef4444;
+    margin-bottom: 20px;
+}
+
+.error-message h4 {
+    color: #f8fafc;
+    margin-bottom: 10px;
+}
+
+.error-message p {
+    color: #94a3b8;
+    margin-bottom: 25px;
+}
+
+/* Video Result */
+.video-result {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.video-result video {
+    width: 100%;
+    border-radius: 12px;
+    background: #000;
+}
+
+.video-info {
+    padding: 20px;
+    background: #1e293b;
+    border-radius: 0 0 12px 12px;
+}
+
+.video-info h4 {
+    margin: 0 0 15px 0;
+    color: #f8fafc;
+    font-size: 1.3rem;
+}
+
+.video-details {
+    display: flex;
+    gap: 20px;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.video-details span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Button states */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
