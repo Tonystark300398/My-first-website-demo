@@ -1,399 +1,189 @@
-// Stark Video AI - Main Script (Fixed Version)
+// Stark Video AI - Main Script (Optimized & Debugged Version)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Stark Video AI is ready!');
+    console.log('🚀 Stark Video AI initialized');
     
-    // ==================== INITIALIZE VARIABLES ====================
-    let currentVideoUrl = null;
-    let isGenerating = false;
-    let generationTimer = null;
-    let currentJobId = null;
-    
-    // API Configuration
-    const API_CONFIG = {
-        BASE_URL: 'https://58fhjfjqof.execute-api.ap-southeast-2.amazonaws.com/default/stark-video-generator',
-        TIMEOUT: 30000 // 30 seconds
+    // ==================== GLOBAL STATE ====================
+    const state = {
+        isGenerating: false,
+        generationTimer: null,
+        currentJobId: null,
+        currentVideoUrl: null
     };
     
-    // ==================== INITIAL SETUP ====================
-    initApp();
+    // ==================== API CONFIG ====================
+    const API_CONFIG = {
+        BASE_URL: 'https://58fhjfjqof.execute-api.ap-southeast-2.amazonaws.com/default/stark-video-generator',
+        TIMEOUT: 30000
+    };
     
-    function initApp() {
-        // 1. Initialize real-time
-        updateRealTime();
-        setInterval(updateRealTime, 1000);
+    // ==================== DOM ELEMENTS ====================
+    const elements = {
+        // Inputs
+        promptInput: document.getElementById('video-prompt'),
+        styleSelect: document.getElementById('video-style'),
+        lengthSelect: document.getElementById('video-length'),
+        aspectSelect: document.getElementById('aspect-ratio'),
         
-        // 2. Initialize visit counter
-        initializeVisitCounter();
+        // Buttons
+        generateBtn: document.getElementById('generate-btn'),
+        downloadBtn: document.getElementById('download-btn'),
+        shareBtn: document.getElementById('share-btn'),
         
-        // 3. Initialize character counter
-        initializeCharCounter();
+        // UI Components
+        progressContainer: document.getElementById('progress-container'),
+        progressFill: document.getElementById('progress-fill'),
+        progressPercent: document.getElementById('progress-percent'),
+        videoResult: document.getElementById('video-result'),
+        generatedVideo: document.getElementById('generated-video'),
+        outputPlaceholder: document.querySelector('.output-placeholder')
+    };
+    
+    // ==================== INITIALIZATION ====================
+    function init() {
+        console.log('🔧 Initializing application...');
         
-        // 4. Setup event listeners
+        // Validate critical elements
+        if (!elements.generateBtn) {
+            console.error('❌ Generate button not found!');
+            return;
+        }
+        
+        // Setup event listeners
         setupEventListeners();
         
-        // 5. Load saved preferences
-        loadUserPreferences();
-        
-        // 6. Check for mobile menu
-        checkMobileView();
-    }
-    
-    // ==================== TIME & DATE FUNCTIONS ====================
-    function updateRealTime() {
-        const now = new Date();
-        const options = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            timeZone: 'Asia/Ho_Chi_Minh'
-        };
-        
-        const timeString = now.toLocaleTimeString('en-US');
-        const dateString = now.toLocaleDateString('en-US', options);
-        
-        // Update footer time
-        const timeElement = document.getElementById('current-time');
-        if (timeElement) {
-            timeElement.innerHTML = `<i class="fas fa-clock"></i> ${dateString}`;
+        // Initialize character counter
+        if (elements.promptInput) {
+            elements.promptInput.addEventListener('input', updateCharCounter);
         }
-    }
-    
-    // ==================== VISIT COUNTER ====================
-    function initializeVisitCounter() {
-        try {
-            let visits = localStorage.getItem('starkVisits');
-            if (!visits) {
-                visits = Math.floor(Math.random() * 10000) + 12000;
-                localStorage.setItem('starkVisits', visits);
-            } else {
-                visits = parseInt(visits);
-                visits += 1;
-                localStorage.setItem('starkVisits', visits);
-            }
-            
-            // Format number with commas
-            const formattedVisits = visits.toLocaleString('en-US');
-            document.getElementById('visit-count').innerHTML = 
-                `<i class="fas fa-users"></i> ${formattedVisits} active users`;
-                
-        } catch (error) {
-            console.error('Error initializing visit counter:', error);
-            document.getElementById('visit-count').innerHTML = 
-                `<i class="fas fa-users"></i> 12,458 active users`;
-        }
-    }
-    
-    // ==================== CHARACTER COUNTER ====================
-    function initializeCharCounter() {
-        const promptInput = document.getElementById('video-prompt');
-        const charCount = document.getElementById('char-count');
         
-        if (promptInput && charCount) {
-            promptInput.addEventListener('input', function() {
-                const length = this.value.length;
-                charCount.textContent = `${length}/500`;
-                
-                // Change color based on length
-                if (length < 50) {
-                    charCount.style.color = '#ff6b6b';
-                } else if (length < 150) {
-                    charCount.style.color = '#ffa726';
-                } else {
-                    charCount.style.color = '#4CAF50';
-                }
-            });
-            
-            // Auto-resize textarea
-            promptInput.addEventListener('focus', function() {
-                this.style.height = '150px';
-            });
-        }
+        console.log('✅ Application initialized successfully');
     }
     
-    // ==================== VIDEO GENERATION ====================
+    // ==================== EVENT LISTENERS ====================
     function setupEventListeners() {
-        // Generate Button
-        const generateBtn = document.getElementById('generate-btn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', generateVideo);
+        // Generate button - SINGLE event listener
+        elements.generateBtn.addEventListener('click', handleGenerateClick);
+        
+        // Other buttons (if they exist)
+        if (elements.downloadBtn) {
+            elements.downloadBtn.addEventListener('click', downloadVideo);
         }
         
-        // Try Free Button
-        const tryFreeBtn = document.getElementById('try-free-btn');
-        if (tryFreeBtn) {
-            tryFreeBtn.addEventListener('click', () => {
-                showNotification('Starting free trial!', 'success');
-                document.getElementById('video-prompt').focus();
-            });
+        if (elements.shareBtn) {
+            elements.shareBtn.addEventListener('click', shareVideo);
         }
         
-        // Sign Up Button
-        const signupBtn = document.getElementById('signup-btn');
-        if (signupBtn) {
-            signupBtn.addEventListener('click', () => {
-                showModal('Sign Up', 'Sign up feature is under development. Please check back later!', 'info');
-            });
-        }
-        
-        // Login Button
-        const loginBtn = document.getElementById('login-btn');
-        if (loginBtn) {
-            loginBtn.addEventListener('click', () => {
-                showModal('Sign In', 'Sign in feature is under development. Please check back later!', 'info');
-            });
-        }
-        
-        // Download Button
-        const downloadBtn = document.getElementById('download-btn');
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', downloadVideo);
-        }
-        
-        // Share Button
-        const shareBtn = document.getElementById('share-btn');
-        if (shareBtn) {
-            shareBtn.addEventListener('click', shareVideo);
-        }
-        
-        // Mobile Menu
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-        }
-        
-        // Close Modal
-        const closeModalBtn = document.getElementById('close-modal');
-        if (closeModalBtn) {
-            closeModalBtn.addEventListener('click', closeVideoModal);
-        }
-        
-        // Smooth scrolling for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href');
-                if (targetId === '#') return;
-                
-                const targetElement = document.querySelector(targetId);
-                if (targetElement) {
-                    targetElement.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                    
-                    // Close mobile menu if open
-                    document.querySelector('.nav-links').classList.remove('active');
+        // Keyboard shortcut: Ctrl/Cmd + Enter
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                if (elements.promptInput === document.activeElement) {
+                    e.preventDefault();
+                    handleGenerateClick();
                 }
-            });
+            }
         });
         
-        // Example prompts
-        setupExamplePrompts();
+        console.log('🎯 Event listeners setup complete');
     }
     
-    function setupExamplePrompts() {
-        const promptInput = document.getElementById('video-prompt');
-        const examplePrompts = [
-            "A panda eating bamboo on a mountain in the early morning with sunlight shining through mist",
-            "Future city with skyscrapers, flying cars and robots moving on the streets",
-            "Sunset beach scene with gentle waves, golden sand and seagulls flying",
-            "Tropical rainforest with large waterfall, wildlife and lush vegetation",
-            "New Year's Eve fireworks display in Tokyo with large crowds"
-        ];
+    // ==================== MAIN GENERATION HANDLER ====================
+    async function handleGenerateClick() {
+        console.log('🖱️ Button clicked - START');
         
-        // Add clickable examples
-        const examplesSection = document.querySelector('.examples-section');
-        if (examplesSection) {
-            examplePrompts.forEach((prompt, index) => {
-                const exampleBtn = document.createElement('button');
-                exampleBtn.className = 'example-prompt-btn';
-                exampleBtn.innerHTML = `<i class="fas fa-lightbulb"></i> ${prompt.substring(0, 50)}...`;
-                exampleBtn.title = prompt;
-                exampleBtn.addEventListener('click', () => {
-                    promptInput.value = prompt;
-                    promptInput.dispatchEvent(new Event('input'));
-                    showNotification(`Applied example ${index + 1}`, 'info');
-                });
-                examplesSection.appendChild(exampleBtn);
-            });
-        }
-    }
-    
-    // ==================== MAIN GENERATE VIDEO FUNCTION ====================
-    // async function generateVideo() {
-    //     if (isGenerating) {
-    //         showNotification('Generating video, please wait...', 'warning');
-    //         return;
-    //     }
-        
-    //     const promptInput = document.getElementById('video-prompt');
-    //     const prompt = promptInput.value.trim();
-        
-    //     if (!prompt) {
-    //         showNotification('Please enter video description!', 'error');
-    //         promptInput.focus();
-    //         return;
-    //     }
-        
-    //     if (prompt.length < 3) {
-    //         showNotification('Description too short. Please enter at least 3 characters!', 'error');
-    //         return;
-    //     }
-        
-    //     // Get selected options
-    //     const videoStyle = document.getElementById('video-style').value;
-    //     const videoLength = document.getElementById('video-length').value;
-    //     const aspectRatio = document.getElementById('aspect-ratio').value;
-        
-    //     // Show progress UI
-    //     showProgress();
-    //     isGenerating = true;
-        
-    //     // Disable generate button
-    //     const generateBtn = document.getElementById('generate-btn');
-    //     generateBtn.disabled = true;
-    //     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting to API...';
-        
-    //     // Hide placeholder and result
-    //     document.querySelector('.output-placeholder').style.display = 'none';
-    //     document.getElementById('video-result').style.display = 'none';
-        
-    //     // Start progress simulation (UI only)
-    //     startProgressSimulation();
-        
-    //     try {
-    //         console.log('Sending request to API...');
-            
-    //         // Send request to AWS Lambda via API Gateway
-    //         const response = await fetch(API_CONFIG.BASE_URL, {
-    //             method: 'POST',
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //                 'Accept': 'application/json'
-    //             },
-    //             body: JSON.stringify({
-    //                 prompt: prompt,
-    //                 style: videoStyle,
-    //                 length: parseInt(videoLength),
-    //                 aspect_ratio: aspectRatio
-    //             }),
-    //             signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-    //         });
-            
-    //         console.log('Response status:', response.status);
-            
-    //         if (!response.ok) {
-    //             throw new Error(`HTTP error! status: ${response.status}`);
-    //         }
-            
-    //         const data = await response.json();
-    //         console.log('API Response:', data);
-            
-    //         // Complete progress simulation
-    //         completeProgressSimulation();
-            
-    //         if (data.success) {
-    //             currentJobId = data.job_id;
-                
-    //             // Update UI with success
-    //             showVideoResultUI(prompt, videoStyle, videoLength, aspectRatio);
-                
-    //             // Show success message with job details
-    //             showNotification(
-    //                 `✅ Video job queued successfully! Job ID: ${data.job_id}`,
-    //                 'success'
-    //             );
-                
-    //             // Log SQS message info
-    //             console.log('SQS Message ID:', data.sqs_message_id);
-    //             console.log('Queue URL:', data.queue_url);
-                
-    //         } else {
-    //             throw new Error(data.error || 'API request failed');
-    //         }
-            
-    //     } catch (error) {
-    //         console.error('Error generating video:', error);
-            
-    //         // Stop progress simulation
-    //         clearInterval(generationTimer);
-            
-    //         // Show error in UI
-    //         showGenerationError(error.message || 'Failed to generate video');
-            
-    //         // Show error notification
-    //         showNotification(`❌ Error: ${error.message}`, 'error');
-            
-    //     } finally {
-    //         // Reset button state
-    //         isGenerating = false;
-    //         generateBtn.disabled = false;
-    //         generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
-    //     }
-        
-    //     // Save to history
-    //     saveToHistory(prompt, videoStyle, videoLength);
-    // }
-        async function generateVideo() {
-        console.log('🔄 === generateVideo START ===');
-        
-        if (isGenerating) {
-            console.log('⛔ Blocked: Already generating');
-            showNotification('Generating video, please wait...', 'warning');
+        // Prevent multiple clicks
+        if (state.isGenerating) {
+            console.log('⏸️ Already generating, skipping');
+            showNotification('Please wait for current generation to complete', 'warning');
             return;
         }
         
-        const promptInput = document.getElementById('video-prompt');
-        const prompt = promptInput.value.trim();
+        // Validate inputs
+        if (!validateInputs()) {
+            return;
+        }
+        
+        // Get form data
+        const formData = getFormData();
+        
+        // Update UI state
+        setGeneratingState(true);
+        
+        try {
+            // Show progress UI
+            showProgressUI();
+            
+            // Send API request
+            const result = await sendGenerationRequest(formData);
+            
+            if (result.success) {
+                // Update state with job info
+                state.currentJobId = result.job_id;
+                
+                // Show success UI
+                showSuccessUI(formData, result);
+                
+                // Show notification
+                showNotification(`✅ Video job queued! Job ID: ${result.job_id}`, 'success');
+                
+            } else {
+                throw new Error(result.error || 'Generation failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Generation error:', error);
+            showErrorUI(error.message);
+            showNotification(`❌ Error: ${error.message}`, 'error');
+            
+        } finally {
+            // ALWAYS reset state
+            setGeneratingState(false);
+            console.log('🔄 Button state reset');
+        }
+        
+        console.log('🏁 Button clicked - END');
+    }
+    
+    // ==================== VALIDATION ====================
+    function validateInputs() {
+        if (!elements.promptInput) {
+            showNotification('Prompt input not found', 'error');
+            return false;
+        }
+        
+        const prompt = elements.promptInput.value.trim();
         
         if (!prompt) {
-            showNotification('Please enter video description!', 'error');
-            promptInput.focus();
-            return;
+            showNotification('Please enter a video description', 'error');
+            elements.promptInput.focus();
+            return false;
         }
         
         if (prompt.length < 3) {
-            showNotification('Description too short. Please enter at least 3 characters!', 'error');
-            return;
+            showNotification('Description must be at least 3 characters', 'error');
+            return false;
         }
         
-        // Get selected options
-        const videoStyle = document.getElementById('video-style').value;
-        const videoLength = document.getElementById('video-length').value;
-        const aspectRatio = document.getElementById('aspect-ratio').value;
+        return true;
+    }
+    
+    // ==================== FORM DATA ====================
+    function getFormData() {
+        return {
+            prompt: elements.promptInput.value.trim(),
+            style: elements.styleSelect ? elements.styleSelect.value : 'realistic',
+            length: elements.lengthSelect ? parseInt(elements.lengthSelect.value) : 5,
+            aspect_ratio: elements.aspectSelect ? elements.aspectSelect.value : '16:9'
+        };
+    }
+    
+    // ==================== API REQUEST ====================
+    async function sendGenerationRequest(formData) {
+        console.log('📤 Sending API request:', formData);
         
-        // Show progress UI
-        showProgress();
-        isGenerating = true;
-        
-        // Disable generate button
-        const generateBtn = document.getElementById('generate-btn');
-        const originalButtonHTML = generateBtn.innerHTML; // Lưu trạng thái gốc
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting to API...';
-        
-        // Hide placeholder and result
-        document.querySelector('.output-placeholder').style.display = 'none';
-        document.getElementById('video-result').style.display = 'none';
-        
-        // Clear any existing timer
-        if (generationTimer) {
-            clearInterval(generationTimer);
-            generationTimer = null;
-            console.log('🧹 Cleared existing timer');
-        }
-        
-        // Start progress simulation (UI only)
-        startProgressSimulation();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
         
         try {
-            console.log('📤 Sending request to API...');
-            
-            // Send request to AWS Lambda via API Gateway
             const response = await fetch(API_CONFIG.BASE_URL, {
                 method: 'POST',
                 headers: {
@@ -402,14 +192,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-Request-Source': 'stark_video_web',
                     'X-Client-Version': '1.0.0'
                 },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    style: videoStyle,
-                    length: parseInt(videoLength),
-                    aspect_ratio: aspectRatio
-                }),
-                signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
+                body: JSON.stringify(formData),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             console.log('📥 Response status:', response.status);
             
@@ -419,176 +206,183 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const data = await response.json();
-            console.log('✅ API Response:', data);
+            console.log('✅ API response:', data);
             
-            // Complete progress simulation
-            completeProgressSimulation();
-            
-            if (data.success) {
-                currentJobId = data.job_id;
-                
-                // Update UI with success
-                showVideoResultUI(prompt, videoStyle, videoLength, aspectRatio);
-                
-                // Show success message with job details
-                showNotification(
-                    `✅ Video job queued successfully! Job ID: ${data.job_id}`,
-                    'success'
-                );
-                
-                // Log SQS message info
-                console.log('📨 SQS Message ID:', data.sqs_message_id);
-                console.log('📦 Queue URL:', data.queue_url);
-                
-            } else {
-                throw new Error(data.error || 'API request failed');
-            }
+            return data;
             
         } catch (error) {
-            console.error('❌ Error generating video:', error);
-            
-            // Stop progress simulation
-            if (generationTimer) {
-                clearInterval(generationTimer);
-                generationTimer = null;
-            }
-            
-            // Show error in UI
-            showGenerationError(error.message || 'Failed to generate video');
-            
-            // Show error notification
-            showNotification(`❌ Error: ${error.message}`, 'error');
-            
-        } finally {
-            console.log('🔄 FINALLY: Resetting button state');
-            
-            // ⭐⭐ QUAN TRỌNG: ALWAYS CLEAR TIMER ⭐⭐
-            if (generationTimer) {
-                clearInterval(generationTimer);
-                generationTimer = null;
-                console.log('🧹 Timer cleared in finally block');
-            }
-            
-            // ⭐⭐ QUAN TRỌNG: ALWAYS RESET STATE ⭐⭐
-            isGenerating = false;
-            
-            // Reset button
-            const generateBtn = document.getElementById('generate-btn');
-            if (generateBtn) {
-                generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
-            }
-            
-            console.log('🔄 Button state reset. isGenerating:', isGenerating);
+            clearTimeout(timeoutId);
+            throw error;
+        }
+    }
+    
+    // ==================== UI STATE MANAGEMENT ====================
+    function setGeneratingState(isGenerating) {
+        state.isGenerating = isGenerating;
+        
+        if (elements.generateBtn) {
+            elements.generateBtn.disabled = isGenerating;
+            elements.generateBtn.innerHTML = isGenerating 
+                ? '<i class="fas fa-spinner fa-spin"></i> Processing...' 
+                : '<i class="fas fa-bolt"></i> Generate Video';
         }
         
-        // Save to history
-        saveToHistory(prompt, videoStyle, videoLength);
-        console.log('🔄 === generateVideo END ===');
+        // Clear any existing timer
+        if (state.generationTimer) {
+            clearInterval(state.generationTimer);
+            state.generationTimer = null;
+        }
     }
-    function startProgressSimulation() {
+    
+    function showProgressUI() {
+        // Hide previous results
+        if (elements.videoResult) {
+            elements.videoResult.style.display = 'none';
+        }
+        
+        if (elements.outputPlaceholder) {
+            elements.outputPlaceholder.style.display = 'none';
+        }
+        
+        // Show progress
+        if (elements.progressContainer) {
+            elements.progressContainer.style.display = 'block';
+            
+            // Reset progress bar
+            if (elements.progressFill) {
+                elements.progressFill.style.width = '0%';
+            }
+            if (elements.progressPercent) {
+                elements.progressPercent.textContent = '0%';
+            }
+        }
+        
+        // Start progress animation
+        startProgressAnimation();
+    }
+    
+    function startProgressAnimation() {
         let progress = 0;
-        const progressFill = document.getElementById('progress-fill');
-        const progressPercent = document.getElementById('progress-percent');
-        const stepElements = document.querySelectorAll('.progress-steps .step');
         
-        // Reset steps
-        stepElements.forEach(step => step.classList.remove('active'));
-        
-        // Show progress container
-        document.getElementById('progress-container').style.display = 'block';
-        
-        generationTimer = setInterval(() => {
-            // Simulate slower progress for realistic feel
+        state.generationTimer = setInterval(() => {
             progress += 0.5;
             
+            // Cap at 95% until API response
             if (progress > 95) {
-                progress = 95; // Don't reach 100% until API response
+                progress = 95;
             }
             
-            progressFill.style.width = `${progress}%`;
-            progressPercent.textContent = `${Math.round(progress)}%`;
-            
-            // Update active step
-            if (progress <= 25) {
-                stepElements[0].classList.add('active');
-            } else if (progress <= 50) {
-                stepElements[1].classList.add('active');
-            } else if (progress <= 75) {
-                stepElements[2].classList.add('active');
-            } else {
-                stepElements[3].classList.add('active');
+            // Update progress bar
+            if (elements.progressFill) {
+                elements.progressFill.style.width = `${progress}%`;
             }
+            if (elements.progressPercent) {
+                elements.progressPercent.textContent = `${Math.round(progress)}%`;
+            }
+            
         }, 100);
     }
     
-    function completeProgressSimulation() {
-        clearInterval(generationTimer);
+    function showSuccessUI(formData, apiResult) {
+        // Complete progress animation
+        if (state.generationTimer) {
+            clearInterval(state.generationTimer);
+            state.generationTimer = null;
+        }
         
-        const progressFill = document.getElementById('progress-fill');
-        const progressPercent = document.getElementById('progress-percent');
-        
-        // Animate to 100%
-        progressFill.style.width = '100%';
-        progressPercent.textContent = '100%';
+        // Set progress to 100%
+        if (elements.progressFill) {
+            elements.progressFill.style.width = '100%';
+        }
+        if (elements.progressPercent) {
+            elements.progressPercent.textContent = '100%';
+        }
         
         // Hide progress after delay
         setTimeout(() => {
-            document.getElementById('progress-container').style.display = 'none';
+            if (elements.progressContainer) {
+                elements.progressContainer.style.display = 'none';
+            }
+            
+            // Show video result
+            if (elements.videoResult) {
+                elements.videoResult.style.display = 'block';
+                
+                // Set video source (placeholder for now)
+                if (elements.generatedVideo) {
+                    const placeholderUrl = getPlaceholderVideo(formData.style);
+                    elements.generatedVideo.src = placeholderUrl;
+                    state.currentVideoUrl = placeholderUrl;
+                    
+                    // Try to autoplay
+                    setTimeout(() => {
+                        elements.generatedVideo.play().catch(e => {
+                            console.log('Autoplay prevented:', e.message);
+                        });
+                    }, 500);
+                }
+                
+                // Enable download/share buttons
+                if (elements.downloadBtn) elements.downloadBtn.disabled = false;
+                if (elements.shareBtn) elements.shareBtn.disabled = false;
+            }
         }, 1000);
     }
     
-    function showVideoResultUI(prompt, style, length, ratio) {
-        // Show result container
-        const videoResult = document.getElementById('video-result');
-        videoResult.style.display = 'block';
+    function showErrorUI(errorMessage) {
+        // Stop progress animation
+        if (state.generationTimer) {
+            clearInterval(state.generationTimer);
+            state.generationTimer = null;
+        }
         
-        // Update video details
-        document.getElementById('video-title').textContent = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
-        document.getElementById('video-duration').textContent = `${length}s`;
-        document.getElementById('video-style-result').textContent = getStyleName(style);
-        document.getElementById('video-ratio').textContent = ratio;
-        
-        // Use placeholder video (actual video will come later from SQS processing)
-        const videoElement = document.getElementById('generated-video');
-        const videoSource = getVideoPlaceholder(style);
-        currentVideoUrl = videoSource;
-        
-        videoElement.src = videoSource;
-        videoElement.load();
-        
-        // Enable action buttons
-        document.getElementById('download-btn').disabled = false;
-        document.getElementById('share-btn').disabled = false;
-        
-        // Auto-play video
-        setTimeout(() => {
-            videoElement.play().catch(e => {
-                console.log('Autoplay prevented:', e.message);
-            });
-        }, 500);
-    }
-    
-    function showGenerationError(errorMessage) {
         // Hide progress
-        document.getElementById('progress-container').style.display = 'none';
+        if (elements.progressContainer) {
+            elements.progressContainer.style.display = 'none';
+        }
         
-        // Show error in placeholder
-        const outputPlaceholder = document.querySelector('.output-placeholder');
-        outputPlaceholder.style.display = 'block';
-        outputPlaceholder.innerHTML = `
-            <div class="error-placeholder">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h4>Generation Failed</h4>
-                <p>${errorMessage}</p>
-                <button class="btn btn-retry" onclick="location.reload()">
-                    <i class="fas fa-redo"></i> Try Again
-                </button>
-            </div>
-        `;
+        // Show error message
+        if (elements.outputPlaceholder) {
+            elements.outputPlaceholder.style.display = 'block';
+            elements.outputPlaceholder.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff6b6b; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 0.5rem;">Generation Failed</h4>
+                    <p style="color: #666; margin-bottom: 1.5rem;">${errorMessage}</p>
+                    <button onclick="window.location.reload()" style="
+                        background: #4a6fa5;
+                        color: white;
+                        border: none;
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
     }
     
-    function getVideoPlaceholder(style) {
+    // ==================== HELPER FUNCTIONS ====================
+    function updateCharCounter() {
+        const charCount = document.getElementById('char-count');
+        if (charCount && elements.promptInput) {
+            const length = elements.promptInput.value.length;
+            charCount.textContent = `${length}/500`;
+            
+            // Color coding
+            if (length < 50) {
+                charCount.style.color = '#ff6b6b';
+            } else if (length < 150) {
+                charCount.style.color = '#ffa726';
+            } else {
+                charCount.style.color = '#4CAF50';
+            }
+        }
+    }
+    
+    function getPlaceholderVideo(style) {
         const placeholders = {
             realistic: 'https://assets.mixkit.co/videos/preview/mixkit-sunset-over-a-lake-1867-large.mp4',
             anime: 'https://assets.mixkit.co/videos/preview/mixkit-anime-style-magic-sparkles-1412-large.mp4',
@@ -601,358 +395,119 @@ document.addEventListener('DOMContentLoaded', function() {
         return placeholders[style] || placeholders.realistic;
     }
     
-    function getStyleName(styleValue) {
-        const styles = {
-            realistic: 'Realistic',
-            anime: 'Anime',
-            cinematic: 'Cinematic',
-            '3d-animation': '3D Animation',
-            artistic: 'Artistic',
-            cartoon: 'Cartoon'
-        };
-        
-        return styles[styleValue] || styleValue;
-    }
-    
-    function showProgress() {
-        // Reset progress bar
-        document.getElementById('progress-fill').style.width = '0%';
-        document.getElementById('progress-percent').textContent = '0%';
-        
-        // Reset steps
-        const stepElements = document.querySelectorAll('.progress-steps .step');
-        stepElements.forEach((step, index) => {
-            step.classList.toggle('active', index === 0);
-        });
-    }
-    
-    // ==================== VIDEO ACTIONS ====================
     function downloadVideo() {
-        if (!currentVideoUrl) {
-            showNotification('No video to download!', 'error');
+        if (!state.currentVideoUrl) {
+            showNotification('No video to download', 'error');
             return;
         }
         
-        showNotification('Downloading video...', 'info');
+        const link = document.createElement('a');
+        link.href = state.currentVideoUrl;
+        link.download = `stark-video-${Date.now()}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
-        // Create download link
-        const a = document.createElement('a');
-        a.href = currentVideoUrl;
-        a.download = `stark-video-${Date.now()}.mp4`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        // Show success message
-        setTimeout(() => {
-            showNotification('✅ Video downloaded successfully!', 'success');
-            trackEvent('video_download');
-        }, 1500);
+        showNotification('Download started', 'info');
     }
     
     function shareVideo() {
-        if (!currentVideoUrl) {
-            showNotification('No video to share!', 'error');
+        if (!state.currentJobId) {
+            showNotification('No video to share', 'error');
             return;
         }
         
-        const shareUrl = currentJobId 
-            ? `${window.location.origin}/video/${currentJobId}`
-            : `${window.location.origin}/video/demo`;
+        const shareUrl = `${window.location.origin}/video/${state.currentJobId}`;
         
-        showModal(
-            'Share Video',
-            `
-            <div class="share-options">
-                <button class="share-option" onclick="shareToFacebook('${shareUrl}')">
-                    <i class="fab fa-facebook"></i> Facebook
-                </button>
-                <button class="share-option" onclick="shareToTwitter('${shareUrl}')">
-                    <i class="fab fa-twitter"></i> Twitter
-                </button>
-                <button class="share-option" onclick="copyShareLink('${shareUrl}')">
-                    <i class="fas fa-link"></i> Copy Link
-                </button>
-            </div>
-            `,
-            'share'
-        );
-        
-        trackEvent('video_share');
+        if (navigator.share) {
+            // Use Web Share API if available
+            navigator.share({
+                title: 'Stark AI Generated Video',
+                text: 'Check out this AI-generated video!',
+                url: shareUrl
+            });
+        } else {
+            // Fallback to copy link
+            navigator.clipboard.writeText(shareUrl)
+                .then(() => showNotification('Link copied to clipboard!', 'success'))
+                .catch(() => showNotification('Failed to copy link', 'error'));
+        }
     }
     
-    // ==================== UI HELPERS ====================
     function showNotification(message, type = 'info') {
-        // Remove existing notifications
-        const existingNotification = document.querySelector('.notification');
-        if (existingNotification) {
-            existingNotification.remove();
-        }
+        // Remove existing notification
+        const existing = document.querySelector('.stark-notification');
+        if (existing) existing.remove();
         
         // Create notification
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `stark-notification stark-notification-${type}`;
         notification.innerHTML = `
             <div class="notification-content">
-                <i class="fas fa-${getNotificationIcon(type)}"></i>
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
                 <span>${message}</span>
             </div>
             <button class="notification-close">&times;</button>
         `;
         
-        document.body.appendChild(notification);
+        // Add styles
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        `;
+        
+        notification.querySelector('.notification-content').style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        `;
+        
+        notification.querySelector('.notification-close').style.cssText = `
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 1rem;
+            padding: 0 0.5rem;
+        `;
         
         // Add close functionality
         notification.querySelector('.notification-close').addEventListener('click', () => {
             notification.remove();
         });
         
-        // Auto remove after 5 seconds
+        // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();
             }
         }, 5000);
-    }
-    
-    function getNotificationIcon(type) {
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-circle',
-            warning: 'exclamation-triangle',
-            info: 'info-circle'
-        };
         
-        return icons[type] || 'info-circle';
-    }
-    
-    function showModal(title, content, type = 'default') {
-        // Create modal
-        const modal = document.createElement('div');
-        modal.id = 'custom-modal-' + Date.now();
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal-container modal-${type}">
-                <div class="modal-header">
-                    <h3>${title}</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">${content}</div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary modal-close-btn">Close</button>
-                </div>
-            </div>
+        // Add animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
         `;
+        document.head.appendChild(style);
         
-        document.body.appendChild(modal);
-        
-        // Show modal
-        modal.style.display = 'flex';
-        
-        // Add close functionality
-        const closeButtons = modal.querySelectorAll('.modal-close, .modal-close-btn');
-        closeButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                modal.style.display = 'none';
-                setTimeout(() => modal.remove(), 300);
-            });
-        });
-        
-        // Close on background click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-                setTimeout(() => modal.remove(), 300);
-            }
-        });
+        document.body.appendChild(notification);
     }
     
-    function closeVideoModal() {
-        const modal = document.getElementById('video-modal');
-        if (modal) {
-            modal.style.display = 'none';
-            const video = document.getElementById('modal-video');
-            if (video) video.pause();
-        }
-    }
-    
-    function toggleMobileMenu() {
-        const navLinks = document.querySelector('.nav-links');
-        navLinks.classList.toggle('active');
-        
-        const menuBtn = document.getElementById('mobile-menu-btn');
-        menuBtn.innerHTML = navLinks.classList.contains('active') 
-            ? '<i class="fas fa-times"></i>' 
-            : '<i class="fas fa-bars"></i>';
-    }
-    
-    function checkMobileView() {
-        if (window.innerWidth <= 768) {
-            document.body.classList.add('mobile-view');
-        } else {
-            document.body.classList.remove('mobile-view');
-        }
-    }
-    
-    // ==================== DATA MANAGEMENT ====================
-    function saveToHistory(prompt, style, length) {
-        try {
-            const history = JSON.parse(localStorage.getItem('starkVideoHistory')) || [];
-            
-            const historyItem = {
-                id: Date.now(),
-                prompt: prompt,
-                style: style,
-                length: length,
-                job_id: currentJobId,
-                timestamp: new Date().toISOString(),
-                status: 'queued'
-            };
-            
-            history.unshift(historyItem);
-            
-            if (history.length > 50) {
-                history.pop();
-            }
-            
-            localStorage.setItem('starkVideoHistory', JSON.stringify(history));
-            
-            // Update history badge
-            const historyBadge = document.querySelector('.history-badge');
-            if (historyBadge) {
-                historyBadge.textContent = history.length;
-                historyBadge.style.display = 'flex';
-            }
-            
-        } catch (error) {
-            console.error('Error saving history:', error);
-        }
-    }
-    
-    function loadUserPreferences() {
-        try {
-            const preferences = JSON.parse(localStorage.getItem('starkPreferences')) || {};
-            
-            if (preferences.videoStyle) {
-                document.getElementById('video-style').value = preferences.videoStyle;
-            }
-            
-            if (preferences.videoLength) {
-                document.getElementById('video-length').value = preferences.videoLength;
-            }
-            
-            if (preferences.aspectRatio) {
-                document.getElementById('aspect-ratio').value = preferences.aspectRatio;
-            }
-            
-            if (preferences.theme === 'dark') {
-                document.body.classList.add('dark-mode');
-            }
-            
-        } catch (error) {
-            console.error('Error loading preferences:', error);
-        }
-    }
-    
-    function saveUserPreferences() {
-        const preferences = {
-            videoStyle: document.getElementById('video-style').value,
-            videoLength: document.getElementById('video-length').value,
-            aspectRatio: document.getElementById('aspect-ratio').value,
-            theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
-        };
-        
-        localStorage.setItem('starkPreferences', JSON.stringify(preferences));
-    }
-    
-    // ==================== ANALYTICS ====================
-    function trackEvent(eventName, data = {}) {
-        const analytics = {
-            event: eventName,
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            job_id: currentJobId,
-            ...data
-        };
-        
-        console.log('📊 Analytics Event:', analytics);
-    }
-    
-    // ==================== WINDOW EVENTS ====================
-    window.addEventListener('resize', checkMobileView);
-    
-    // Save preferences on change
-    document.getElementById('video-style')?.addEventListener('change', saveUserPreferences);
-    document.getElementById('video-length')?.addEventListener('change', saveUserPreferences);
-    document.getElementById('aspect-ratio')?.addEventListener('change', saveUserPreferences);
-    
-    // ==================== GLOBAL FUNCTIONS ====================
-    window.shareToFacebook = function(url) {
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-        showNotification('Opening Facebook share...', 'info');
-    };
-    
-    window.shareToTwitter = function(url) {
-        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`, '_blank');
-        showNotification('Opening Twitter share...', 'info');
-    };
-    
-    window.copyShareLink = function(url) {
-        navigator.clipboard.writeText(url)
-            .then(() => {
-                showNotification('Link copied to clipboard!', 'success');
-            })
-            .catch(err => {
-                showNotification('Error copying: ' + err, 'error');
-            });
-    };
-    
-    // ==================== KEYBOARD SHORTCUTS ====================
-    document.addEventListener('keydown', (e) => {
-        // Ctrl/Cmd + Enter to generate video
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            if (document.getElementById('video-prompt') === document.activeElement) {
-                e.preventDefault();
-                generateVideo();
-            }
-        }
-        
-        // Escape to close modals
-        if (e.key === 'Escape') {
-            closeVideoModal();
-            const customModal = document.querySelector('.modal-overlay');
-            if (customModal) customModal.style.display = 'none';
-        }
-    });
-    
-    // ==================== PERFORMANCE OPTIMIZATION ====================
-    if ('IntersectionObserver' in window) {
-        const imageObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const img = entry.target;
-                    if (img.dataset.src) {
-                        img.src = img.dataset.src;
-                        img.removeAttribute('data-src');
-                    }
-                    imageObserver.unobserve(img);
-                }
-            });
-        });
-        
-        document.querySelectorAll('img[data-src]').forEach(img => imageObserver.observe(img));
-    }
+    // ==================== START APPLICATION ====================
+    init();
 });
-
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                console.log('ServiceWorker registered:', registration);
-            })
-            .catch(error => {
-                console.log('ServiceWorker registration failed:', error);
-            });
-    });
-}
