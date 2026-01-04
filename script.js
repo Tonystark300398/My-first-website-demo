@@ -1,4 +1,4 @@
-// Stark Video AI - Main Script
+// Stark Video AI - Main Script (Fixed Version)
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Stark Video AI is ready!');
     
@@ -6,6 +6,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentVideoUrl = null;
     let isGenerating = false;
     let generationTimer = null;
+    let currentJobId = null;
+    
+    // API Configuration
+    const API_CONFIG = {
+        BASE_URL: 'https://58fhjfjqof.execute-api.ap-southeast-2.amazonaws.com/default/stark-video-generator',
+        TIMEOUT: 30000 // 30 seconds
+    };
     
     // ==================== INITIAL SETUP ====================
     initApp();
@@ -216,6 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // ==================== MAIN GENERATE VIDEO FUNCTION ====================
     async function generateVideo() {
         if (isGenerating) {
             showNotification('Generating video, please wait...', 'warning');
@@ -231,8 +239,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (prompt.length < 10) {
-            showNotification('Description too short. Please enter at least 10 characters!', 'error');
+        if (prompt.length < 3) {
+            showNotification('Description too short. Please enter at least 3 characters!', 'error');
             return;
         }
         
@@ -241,54 +249,118 @@ document.addEventListener('DOMContentLoaded', function() {
         const videoLength = document.getElementById('video-length').value;
         const aspectRatio = document.getElementById('aspect-ratio').value;
         
-        // Show progress
+        // Show progress UI
         showProgress();
-        
-        // Simulate video generation
-        simulateVideoGeneration(prompt, videoStyle, videoLength, aspectRatio);
-        
-        // Save to history
-        saveToHistory(prompt, videoStyle, videoLength);
-    }
-    
-    function simulateVideoGeneration(prompt, style, length, ratio) {
         isGenerating = true;
         
         // Disable generate button
         const generateBtn = document.getElementById('generate-btn');
         generateBtn.disabled = true;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-        
-        // Show progress container
-        const progressContainer = document.getElementById('progress-container');
-        progressContainer.style.display = 'block';
+        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting to API...';
         
         // Hide placeholder and result
         document.querySelector('.output-placeholder').style.display = 'none';
         document.getElementById('video-result').style.display = 'none';
         
-        let progress = 0;
-        const steps = [
-            {name: 'Text Analysis', duration: 1000},
-            {name: 'AI Generating Images', duration: 2000},
-            {name: 'Creating Video Motion', duration: 3000},
-            {name: 'Adding Sound & Finalizing', duration: 2000}
-        ];
+        // Start progress simulation (UI only)
+        startProgressSimulation();
         
-        // Update steps visually
+        try {
+            console.log('Sending request to API...');
+            
+            // Send request to AWS Lambda via API Gateway
+            const response = await fetch(API_CONFIG.BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    style: videoStyle,
+                    length: parseInt(videoLength),
+                    aspect_ratio: aspectRatio
+                }),
+                signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
+            });
+            
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('API Response:', data);
+            
+            // Complete progress simulation
+            completeProgressSimulation();
+            
+            if (data.success) {
+                currentJobId = data.job_id;
+                
+                // Update UI with success
+                showVideoResultUI(prompt, videoStyle, videoLength, aspectRatio);
+                
+                // Show success message with job details
+                showNotification(
+                    `✅ Video job queued successfully! Job ID: ${data.job_id}`,
+                    'success'
+                );
+                
+                // Log SQS message info
+                console.log('SQS Message ID:', data.sqs_message_id);
+                console.log('Queue URL:', data.queue_url);
+                
+            } else {
+                throw new Error(data.error || 'API request failed');
+            }
+            
+        } catch (error) {
+            console.error('Error generating video:', error);
+            
+            // Stop progress simulation
+            clearInterval(generationTimer);
+            
+            // Show error in UI
+            showGenerationError(error.message || 'Failed to generate video');
+            
+            // Show error notification
+            showNotification(`❌ Error: ${error.message}`, 'error');
+            
+        } finally {
+            // Reset button state
+            isGenerating = false;
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
+        }
+        
+        // Save to history
+        saveToHistory(prompt, videoStyle, videoLength);
+    }
+    
+    function startProgressSimulation() {
+        let progress = 0;
+        const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
         const stepElements = document.querySelectorAll('.progress-steps .step');
+        
+        // Reset steps
         stepElements.forEach(step => step.classList.remove('active'));
         
-        // Start progress simulation
+        // Show progress container
+        document.getElementById('progress-container').style.display = 'block';
+        
         generationTimer = setInterval(() => {
-            progress += 1;
+            // Simulate slower progress for realistic feel
+            progress += 0.5;
             
-            // Update progress bar
-            const progressFill = document.getElementById('progress-fill');
-            const progressPercent = document.getElementById('progress-percent');
+            if (progress > 95) {
+                progress = 95; // Don't reach 100% until API response
+            }
             
             progressFill.style.width = `${progress}%`;
-            progressPercent.textContent = `${progress}%`;
+            progressPercent.textContent = `${Math.round(progress)}%`;
             
             // Update active step
             if (progress <= 25) {
@@ -300,32 +372,37 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 stepElements[3].classList.add('active');
             }
-            
-            // Complete
-            if (progress >= 100) {
-                clearInterval(generationTimer);
-                completeVideoGeneration(prompt, style, length, ratio);
-            }
-        }, 80); // Total ~8 seconds
+        }, 100);
     }
     
-    function completeVideoGeneration(prompt, style, length, ratio) {
-        isGenerating = false;
+    function completeProgressSimulation() {
+        clearInterval(generationTimer);
         
-        // Hide progress
-        document.getElementById('progress-container').style.display = 'none';
+        const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
         
-        // Show result
+        // Animate to 100%
+        progressFill.style.width = '100%';
+        progressPercent.textContent = '100%';
+        
+        // Hide progress after delay
+        setTimeout(() => {
+            document.getElementById('progress-container').style.display = 'none';
+        }, 1000);
+    }
+    
+    function showVideoResultUI(prompt, style, length, ratio) {
+        // Show result container
         const videoResult = document.getElementById('video-result');
         videoResult.style.display = 'block';
         
         // Update video details
-        document.getElementById('video-title').textContent = prompt.substring(0, 50) + '...';
+        document.getElementById('video-title').textContent = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
         document.getElementById('video-duration').textContent = `${length}s`;
         document.getElementById('video-style-result').textContent = getStyleName(style);
         document.getElementById('video-ratio').textContent = ratio;
         
-        // Set video source (using placeholder video)
+        // Use placeholder video (actual video will come later from SQS processing)
         const videoElement = document.getElementById('generated-video');
         const videoSource = getVideoPlaceholder(style);
         currentVideoUrl = videoSource;
@@ -333,26 +410,38 @@ document.addEventListener('DOMContentLoaded', function() {
         videoElement.src = videoSource;
         videoElement.load();
         
-        // Enable buttons
+        // Enable action buttons
         document.getElementById('download-btn').disabled = false;
         document.getElementById('share-btn').disabled = false;
         
-        // Reset generate button
-        const generateBtn = document.getElementById('generate-btn');
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
-        
-        // Show success notification
-        showNotification('🎉 Video generated successfully!', 'success');
-        
-        // Play video automatically
+        // Auto-play video
         setTimeout(() => {
-            videoElement.play().catch(e => console.log('Autoplay prevented:', e));
+            videoElement.play().catch(e => {
+                console.log('Autoplay prevented:', e.message);
+            });
         }, 500);
     }
     
+    function showGenerationError(errorMessage) {
+        // Hide progress
+        document.getElementById('progress-container').style.display = 'none';
+        
+        // Show error in placeholder
+        const outputPlaceholder = document.querySelector('.output-placeholder');
+        outputPlaceholder.style.display = 'block';
+        outputPlaceholder.innerHTML = `
+            <div class="error-placeholder">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h4>Generation Failed</h4>
+                <p>${errorMessage}</p>
+                <button class="btn btn-retry" onclick="location.reload()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            </div>
+        `;
+    }
+    
     function getVideoPlaceholder(style) {
-        // Placeholder video URLs based on style
         const placeholders = {
             realistic: 'https://assets.mixkit.co/videos/preview/mixkit-sunset-over-a-lake-1867-large.mp4',
             anime: 'https://assets.mixkit.co/videos/preview/mixkit-anime-style-magic-sparkles-1412-large.mp4',
@@ -379,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showProgress() {
-        // Reset progress
+        // Reset progress bar
         document.getElementById('progress-fill').style.width = '0%';
         document.getElementById('progress-percent').textContent = '0%';
         
@@ -399,11 +488,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         showNotification('Downloading video...', 'info');
         
-        // Simulate download
+        // Create download link
+        const a = document.createElement('a');
+        a.href = currentVideoUrl;
+        a.download = `stark-video-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Show success message
         setTimeout(() => {
             showNotification('✅ Video downloaded successfully!', 'success');
-            
-            // Track download in analytics
             trackEvent('video_download');
         }, 1500);
     }
@@ -414,32 +509,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Create share modal
+        const shareUrl = currentJobId 
+            ? `${window.location.origin}/video/${currentJobId}`
+            : `${window.location.origin}/video/demo`;
+        
         showModal(
             'Share Video',
             `
             <div class="share-options">
-                <button class="share-option" onclick="shareToFacebook()">
+                <button class="share-option" onclick="shareToFacebook('${shareUrl}')">
                     <i class="fab fa-facebook"></i> Facebook
                 </button>
-                <button class="share-option" onclick="shareToTwitter()">
+                <button class="share-option" onclick="shareToTwitter('${shareUrl}')">
                     <i class="fab fa-twitter"></i> Twitter
                 </button>
-                <button class="share-option" onclick="shareToLinkedIn()">
-                    <i class="fab fa-linkedin"></i> LinkedIn
+                <button class="share-option" onclick="copyShareLink('${shareUrl}')">
+                    <i class="fas fa-link"></i> Copy Link
                 </button>
-                <div class="share-link">
-                    <input type="text" readonly value="${window.location.origin}/video/123" id="share-url">
-                    <button onclick="copyShareLink()">
-                        <i class="fas fa-copy"></i> Copy
-                    </button>
-                </div>
             </div>
             `,
             'share'
         );
         
-        // Track share event
         trackEvent('video_share');
     }
     
@@ -489,29 +580,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showModal(title, content, type = 'default') {
-        // Create modal if not exists
-        let modal = document.getElementById('custom-modal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'custom-modal';
-            modal.className = 'modal-overlay';
-            modal.innerHTML = `
-                <div class="modal-container modal-${type}">
-                    <div class="modal-header">
-                        <h3>${title}</h3>
-                        <button class="modal-close">&times;</button>
-                    </div>
-                    <div class="modal-body">${content}</div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary modal-close-btn">Close</button>
-                    </div>
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'custom-modal-' + Date.now();
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-container modal-${type}">
+                <div class="modal-header">
+                    <h3>${title}</h3>
+                    <button class="modal-close">&times;</button>
                 </div>
-            `;
-            document.body.appendChild(modal);
-        } else {
-            modal.querySelector('.modal-header h3').textContent = title;
-            modal.querySelector('.modal-body').innerHTML = content;
-        }
+                <div class="modal-body">${content}</div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary modal-close-btn">Close</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
         
         // Show modal
         modal.style.display = 'flex';
@@ -521,6 +607,7 @@ document.addEventListener('DOMContentLoaded', function() {
         closeButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 modal.style.display = 'none';
+                setTimeout(() => modal.remove(), 300);
             });
         });
         
@@ -528,6 +615,7 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.style.display = 'none';
+                setTimeout(() => modal.remove(), 300);
             }
         });
     }
@@ -536,8 +624,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('video-modal');
         if (modal) {
             modal.style.display = 'none';
-            
-            // Pause video
             const video = document.getElementById('modal-video');
             if (video) video.pause();
         }
@@ -571,20 +657,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 prompt: prompt,
                 style: style,
                 length: length,
+                job_id: currentJobId,
                 timestamp: new Date().toISOString(),
-                viewed: false
+                status: 'queued'
             };
             
-            history.unshift(historyItem); // Add to beginning
+            history.unshift(historyItem);
             
-            // Keep only last 50 items
             if (history.length > 50) {
                 history.pop();
             }
             
             localStorage.setItem('starkVideoHistory', JSON.stringify(history));
             
-            // Update history badge if exists
+            // Update history badge
             const historyBadge = document.querySelector('.history-badge');
             if (historyBadge) {
                 historyBadge.textContent = history.length;
@@ -600,22 +686,18 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const preferences = JSON.parse(localStorage.getItem('starkPreferences')) || {};
             
-            // Load video style
             if (preferences.videoStyle) {
                 document.getElementById('video-style').value = preferences.videoStyle;
             }
             
-            // Load video length
             if (preferences.videoLength) {
                 document.getElementById('video-length').value = preferences.videoLength;
             }
             
-            // Load aspect ratio
             if (preferences.aspectRatio) {
                 document.getElementById('aspect-ratio').value = preferences.aspectRatio;
             }
             
-            // Load theme
             if (preferences.theme === 'dark') {
                 document.body.classList.add('dark-mode');
             }
@@ -638,11 +720,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ==================== ANALYTICS ====================
     function trackEvent(eventName, data = {}) {
-        // Simulate analytics tracking
         const analytics = {
             event: eventName,
             timestamp: new Date().toISOString(),
             userAgent: navigator.userAgent,
+            job_id: currentJobId,
             ...data
         };
         
@@ -657,25 +739,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('video-length')?.addEventListener('change', saveUserPreferences);
     document.getElementById('aspect-ratio')?.addEventListener('change', saveUserPreferences);
     
-    // ==================== GLOBAL FUNCTIONS (for modal) ====================
-    window.shareToFacebook = function() {
-        showNotification('Sharing to Facebook (demo)', 'info');
+    // ==================== GLOBAL FUNCTIONS ====================
+    window.shareToFacebook = function(url) {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+        showNotification('Opening Facebook share...', 'info');
     };
     
-    window.shareToTwitter = function() {
-        showNotification('Sharing to Twitter (demo)', 'info');
+    window.shareToTwitter = function(url) {
+        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}`, '_blank');
+        showNotification('Opening Twitter share...', 'info');
     };
     
-    window.shareToLinkedIn = function() {
-        showNotification('Sharing to LinkedIn (demo)', 'info');
-    };
-    
-    window.copyShareLink = function() {
-        const shareUrl = document.getElementById('share-url');
-        shareUrl.select();
-        shareUrl.setSelectionRange(0, 99999);
-        
-        navigator.clipboard.writeText(shareUrl.value)
+    window.copyShareLink = function(url) {
+        navigator.clipboard.writeText(url)
             .then(() => {
                 showNotification('Link copied to clipboard!', 'success');
             })
@@ -697,13 +773,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Escape to close modals
         if (e.key === 'Escape') {
             closeVideoModal();
-            const customModal = document.getElementById('custom-modal');
+            const customModal = document.querySelector('.modal-overlay');
             if (customModal) customModal.style.display = 'none';
         }
     });
     
     // ==================== PERFORMANCE OPTIMIZATION ====================
-    // Lazy load images
     if ('IntersectionObserver' in window) {
         const imageObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -722,7 +797,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Service Worker Registration (for PWA capabilities)
+// Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -734,231 +809,3 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
-// DOM Elements
-const videoPrompt = document.getElementById('video-prompt');
-const videoStyle = document.getElementById('video-style');
-const videoLength = document.getElementById('video-length');
-const aspectRatio = document.getElementById('aspect-ratio');
-const generateBtn = document.getElementById('generate-btn');
-const charCount = document.getElementById('char-count');
-const progressContainer = document.getElementById('progress-container');
-const progressFill = document.getElementById('progress-fill');
-const progressPercent = document.getElementById('progress-percent');
-const videoResult = document.getElementById('video-result');
-const generatedVideo = document.getElementById('generated-video');
-const videoTitle = document.getElementById('video-title');
-const videoDuration = document.getElementById('video-duration');
-const videoStyleResult = document.getElementById('video-style-result');
-const videoRatio = document.getElementById('video-ratio');
-const outputPlaceholder = document.querySelector('.output-placeholder');
-const downloadBtn = document.getElementById('download-btn');
-const shareBtn = document.getElementById('share-btn');
-
-// API Configuration
-const API_CONFIG = {
-    BASE_URL: 'https://58fhjfjqof.execute-api.ap-southeast-2.amazonaws.com/default/stark-video-generator', // Thay bằng URL API Gateway thực tế
-    ENDPOINT: '/generate-video',
-    API_KEY: 'YOUR_API_KEY', // Nếu cần xác thực
-    TIMEOUT: 300000 // 5 phút cho video generation
-};
-
-// Character counter
-videoPrompt.addEventListener('input', function() {
-    const count = this.value.length;
-    charCount.textContent = `${count}/500`;
-    charCount.style.color = count > 450 ? '#ff4757' : '#64748b';
-});
-
-// Generate Video Function
-async function generateVideo() {
-    // Get form values
-    const prompt = videoPrompt.value.trim();
-    const style = videoStyle.value;
-    const length = videoLength.value;
-    const ratio = aspectRatio.value;
-    
-    // Validation
-    if (!prompt) {
-        alert('Please enter a video description');
-        videoPrompt.focus();
-        return;
-    }
-    
-    if (prompt.length < 10) {
-        alert('Please provide a more detailed description (at least 10 characters)');
-        return;
-    }
-    
-    // Show progress UI
-    outputPlaceholder.style.display = 'none';
-    progressContainer.style.display = 'block';
-    videoResult.style.display = 'none';
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-    
-    // Simulate progress steps
-    const steps = document.querySelectorAll('.progress-steps .step');
-    steps.forEach(step => step.classList.remove('active'));
-    
-    // Create request data
-    const requestData = {
-        prompt: prompt,
-        style: style,
-        length: parseInt(length),
-        aspect_ratio: ratio,
-        timestamp: new Date().toISOString(),
-        user_agent: navigator.userAgent
-    };
-    
-    console.log('Sending request:', requestData);
-    
-    try {
-        // Step 1: Send POST request to API
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINT}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': API_CONFIG.API_KEY, // Nếu cần
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(requestData),
-            signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('API Response:', data);
-        
-        // Simulate progress updates
-        simulateProgress(data);
-        
-        // Handle successful response
-        if (data.success && data.video_url) {
-            // Update UI with generated video
-            updateVideoResult(data);
-        } else {
-            throw new Error(data.message || 'Failed to generate video');
-        }
-        
-    } catch (error) {
-        console.error('Error generating video:', error);
-        handleGenerationError(error);
-    } finally {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
-    }
-}
-
-// Simulate progress animation
-function simulateProgress(apiData) {
-    let progress = 0;
-    const steps = document.querySelectorAll('.progress-steps .step');
-    
-    const interval = setInterval(() => {
-        progress += Math.random() * 15;
-        if (progress > 100) progress = 100;
-        
-        progressFill.style.width = `${progress}%`;
-        progressPercent.textContent = `${Math.round(progress)}%`;
-        
-        // Update steps based on progress
-        if (progress >= 25 && progress < 50) {
-            steps[0].classList.add('active');
-            steps[1].classList.add('active');
-        } else if (progress >= 50 && progress < 75) {
-            steps[2].classList.add('active');
-        } else if (progress >= 75) {
-            steps[3].classList.add('active');
-        }
-        
-        if (progress >= 100) {
-            clearInterval(interval);
-            // Switch to video result after a delay
-            setTimeout(() => {
-                progressContainer.style.display = 'none';
-            }, 1000);
-        }
-    }, 500);
-}
-
-// Update video result UI
-function updateVideoResult(data) {
-    // Update video player
-    generatedVideo.src = data.video_url || 'https://assets.mixkit.co/videos/preview/mixkit-tree-with-yellow-flowers-1173-large.mp4';
-    generatedVideo.load();
-    
-    // Update video info
-    videoTitle.textContent = data.title || 'Generated Video';
-    videoDuration.textContent = `${data.duration || videoLength.value}s`;
-    videoStyleResult.textContent = videoStyle.options[videoStyle.selectedIndex].text;
-    videoRatio.textContent = aspectRatio.options[aspectRatio.selectedIndex].text;
-    
-    // Show video result
-    setTimeout(() => {
-        videoResult.style.display = 'block';
-        downloadBtn.disabled = false;
-        shareBtn.disabled = false;
-        
-        // Set download link
-        downloadBtn.onclick = () => {
-            downloadVideo(data.video_url || generatedVideo.src);
-        };
-    }, 1500);
-}
-
-// Handle errors
-function handleGenerationError(error) {
-    progressContainer.style.display = 'none';
-    outputPlaceholder.style.display = 'block';
-    
-    const errorHTML = `
-        <div class="error-message">
-            <i class="fas fa-exclamation-triangle"></i>
-            <h4>Generation Failed</h4>
-            <p>${error.message || 'Please try again with a different description.'}</p>
-            <button class="btn btn-outline" onclick="retryGeneration()">Retry</button>
-        </div>
-    `;
-    
-    outputPlaceholder.innerHTML = errorHTML;
-}
-
-// Download video
-function downloadVideo(url) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `stark-video-${Date.now()}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
-
-// Retry function
-function retryGeneration() {
-    outputPlaceholder.innerHTML = `
-        <div class="placeholder-icon">
-            <i class="fas fa-film"></i>
-        </div>
-        <h4>Your Video Will Appear Here</h4>
-        <p>Enter description and click "Generate Video" to start</p>
-    `;
-    generateVideo();
-}
-
-// Event Listeners
-generateBtn.addEventListener('click', generateVideo);
-
-// Enter key to generate
-videoPrompt.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 'Enter') {
-        generateVideo();
-    }
-});
-
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Stark Video AI initialized');
-});
