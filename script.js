@@ -224,8 +224,125 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // ==================== MAIN GENERATE VIDEO FUNCTION ====================
-    async function generateVideo() {
+    // async function generateVideo() {
+    //     if (isGenerating) {
+    //         showNotification('Generating video, please wait...', 'warning');
+    //         return;
+    //     }
+        
+    //     const promptInput = document.getElementById('video-prompt');
+    //     const prompt = promptInput.value.trim();
+        
+    //     if (!prompt) {
+    //         showNotification('Please enter video description!', 'error');
+    //         promptInput.focus();
+    //         return;
+    //     }
+        
+    //     if (prompt.length < 3) {
+    //         showNotification('Description too short. Please enter at least 3 characters!', 'error');
+    //         return;
+    //     }
+        
+    //     // Get selected options
+    //     const videoStyle = document.getElementById('video-style').value;
+    //     const videoLength = document.getElementById('video-length').value;
+    //     const aspectRatio = document.getElementById('aspect-ratio').value;
+        
+    //     // Show progress UI
+    //     showProgress();
+    //     isGenerating = true;
+        
+    //     // Disable generate button
+    //     const generateBtn = document.getElementById('generate-btn');
+    //     generateBtn.disabled = true;
+    //     generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting to API...';
+        
+    //     // Hide placeholder and result
+    //     document.querySelector('.output-placeholder').style.display = 'none';
+    //     document.getElementById('video-result').style.display = 'none';
+        
+    //     // Start progress simulation (UI only)
+    //     startProgressSimulation();
+        
+    //     try {
+    //         console.log('Sending request to API...');
+            
+    //         // Send request to AWS Lambda via API Gateway
+    //         const response = await fetch(API_CONFIG.BASE_URL, {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //                 'Accept': 'application/json'
+    //             },
+    //             body: JSON.stringify({
+    //                 prompt: prompt,
+    //                 style: videoStyle,
+    //                 length: parseInt(videoLength),
+    //                 aspect_ratio: aspectRatio
+    //             }),
+    //             signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
+    //         });
+            
+    //         console.log('Response status:', response.status);
+            
+    //         if (!response.ok) {
+    //             throw new Error(`HTTP error! status: ${response.status}`);
+    //         }
+            
+    //         const data = await response.json();
+    //         console.log('API Response:', data);
+            
+    //         // Complete progress simulation
+    //         completeProgressSimulation();
+            
+    //         if (data.success) {
+    //             currentJobId = data.job_id;
+                
+    //             // Update UI with success
+    //             showVideoResultUI(prompt, videoStyle, videoLength, aspectRatio);
+                
+    //             // Show success message with job details
+    //             showNotification(
+    //                 `✅ Video job queued successfully! Job ID: ${data.job_id}`,
+    //                 'success'
+    //             );
+                
+    //             // Log SQS message info
+    //             console.log('SQS Message ID:', data.sqs_message_id);
+    //             console.log('Queue URL:', data.queue_url);
+                
+    //         } else {
+    //             throw new Error(data.error || 'API request failed');
+    //         }
+            
+    //     } catch (error) {
+    //         console.error('Error generating video:', error);
+            
+    //         // Stop progress simulation
+    //         clearInterval(generationTimer);
+            
+    //         // Show error in UI
+    //         showGenerationError(error.message || 'Failed to generate video');
+            
+    //         // Show error notification
+    //         showNotification(`❌ Error: ${error.message}`, 'error');
+            
+    //     } finally {
+    //         // Reset button state
+    //         isGenerating = false;
+    //         generateBtn.disabled = false;
+    //         generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
+    //     }
+        
+    //     // Save to history
+    //     saveToHistory(prompt, videoStyle, videoLength);
+    // }
+        async function generateVideo() {
+        console.log('🔄 === generateVideo START ===');
+        
         if (isGenerating) {
+            console.log('⛔ Blocked: Already generating');
             showNotification('Generating video, please wait...', 'warning');
             return;
         }
@@ -255,6 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Disable generate button
         const generateBtn = document.getElementById('generate-btn');
+        const originalButtonHTML = generateBtn.innerHTML; // Lưu trạng thái gốc
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting to API...';
         
@@ -262,18 +380,27 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('.output-placeholder').style.display = 'none';
         document.getElementById('video-result').style.display = 'none';
         
+        // Clear any existing timer
+        if (generationTimer) {
+            clearInterval(generationTimer);
+            generationTimer = null;
+            console.log('🧹 Cleared existing timer');
+        }
+        
         // Start progress simulation (UI only)
         startProgressSimulation();
         
         try {
-            console.log('Sending request to API...');
+            console.log('📤 Sending request to API...');
             
             // Send request to AWS Lambda via API Gateway
             const response = await fetch(API_CONFIG.BASE_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'X-Request-Source': 'stark_video_web',
+                    'X-Client-Version': '1.0.0'
                 },
                 body: JSON.stringify({
                     prompt: prompt,
@@ -284,14 +411,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
             });
             
-            console.log('Response status:', response.status);
+            console.log('📥 Response status:', response.status);
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
             
             const data = await response.json();
-            console.log('API Response:', data);
+            console.log('✅ API Response:', data);
             
             // Complete progress simulation
             completeProgressSimulation();
@@ -309,18 +437,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 );
                 
                 // Log SQS message info
-                console.log('SQS Message ID:', data.sqs_message_id);
-                console.log('Queue URL:', data.queue_url);
+                console.log('📨 SQS Message ID:', data.sqs_message_id);
+                console.log('📦 Queue URL:', data.queue_url);
                 
             } else {
                 throw new Error(data.error || 'API request failed');
             }
             
         } catch (error) {
-            console.error('Error generating video:', error);
+            console.error('❌ Error generating video:', error);
             
             // Stop progress simulation
-            clearInterval(generationTimer);
+            if (generationTimer) {
+                clearInterval(generationTimer);
+                generationTimer = null;
+            }
             
             // Show error in UI
             showGenerationError(error.message || 'Failed to generate video');
@@ -329,16 +460,32 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification(`❌ Error: ${error.message}`, 'error');
             
         } finally {
-            // Reset button state
+            console.log('🔄 FINALLY: Resetting button state');
+            
+            // ⭐⭐ QUAN TRỌNG: ALWAYS CLEAR TIMER ⭐⭐
+            if (generationTimer) {
+                clearInterval(generationTimer);
+                generationTimer = null;
+                console.log('🧹 Timer cleared in finally block');
+            }
+            
+            // ⭐⭐ QUAN TRỌNG: ALWAYS RESET STATE ⭐⭐
             isGenerating = false;
-            generateBtn.disabled = false;
-            generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
+            
+            // Reset button
+            const generateBtn = document.getElementById('generate-btn');
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Video with Stark AI';
+            }
+            
+            console.log('🔄 Button state reset. isGenerating:', isGenerating);
         }
         
         // Save to history
         saveToHistory(prompt, videoStyle, videoLength);
+        console.log('🔄 === generateVideo END ===');
     }
-    
     function startProgressSimulation() {
         let progress = 0;
         const progressFill = document.getElementById('progress-fill');
