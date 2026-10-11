@@ -31,8 +31,11 @@
             </ul>
             
             <div class="nav-actions">
-                <button class="btn btn-outline" id="login-btn">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
+                <div class="demo-mode-indicator" id="demo-mode-indicator" style="display: none;">
+                    <i class="fas fa-play-circle"></i> Demo Mode
+                </div>
+                <button class="btn btn-outline" id="settings-btn" title="Click to add API key or enable Demo Mode">
+                    <i class="fas fa-cog"></i> Settings <span class="settings-hint">(API Key)</span>
                 </button>
                 <button class="btn btn-primary" id="try-free-btn">
                     <i class="fas fa-play-circle"></i> Try For Free
@@ -42,6 +45,22 @@
             <button class="mobile-menu-btn" id="mobile-menu-btn">
                 <i class="fas fa-bars"></i>
             </button>
+
+            <!-- Mobile Menu -->
+            <div class="mobile-menu" id="mobile-menu">
+                <ul class="mobile-nav-links">
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#examples">Examples</a></li>
+                    <li><a href="#pricing">Pricing</a></li>
+                    <li class="mobile-settings-link">
+                        <button class="btn btn-outline" id="mobile-settings-btn">
+                            <i class="fas fa-cog"></i> Settings
+                        </button>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
 
@@ -103,6 +122,28 @@
                     <div class="input-header">
                         <h3><i class="fas fa-keyboard"></i> Describe Your Video</h3>
                         <div class="char-count" id="char-count">0/500</div>
+                    </div>
+
+                    <div class="setup-guide" id="setup-guide">
+                        <div class="setup-guide-content">
+                            <i class="fas fa-rocket"></i>
+                            <div class="setup-guide-text">
+                                <h4>Quick Setup Required</h4>
+                                <p>To generate videos, you need either:</p>
+                                <ul>
+                                    <li><strong>Option 1:</strong> Add your ThankYou AI API key in Settings</li>
+                                    <li><strong>Option 2:</strong> Enable Demo Mode in Settings (no API key needed)</li>
+                                </ul>
+                                <button class="btn btn-primary btn-sm" id="open-settings-btn">
+                                    <i class="fas fa-cog"></i> Open Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="api-notice" id="api-notice" style="display: none;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>API key not configured. <a href="#" id="configure-api-link">Click here to set up</a> or enable Demo Mode in Settings.</span>
                     </div>
                     
                     <textarea 
@@ -385,6 +426,59 @@
                     <source src="" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-cog"></i> API Settings</h3>
+                <button class="close-modal" id="close-settings-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="api-key">
+                            <i class="fas fa-key"></i> ThankYou AI API Key
+                        </label>
+                        <input
+                            type="password"
+                            id="api-key"
+                            class="settings-input"
+                            placeholder="Enter your API key"
+                        />
+                        <p class="settings-help">
+                            Get your free API key from <a href="https://thankyouai.com" target="_blank">thankyouai.com</a>
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-info-circle"></i> Model Selection
+                        </label>
+                        <select id="model-select" class="settings-select">
+                            <option value="kling-v3">Kling v3 (Standard)</option>
+                            <option value="kling-v3-pro">Kling v3 Pro (Higher Quality)</option>
+                            <option value="kling-o1">Kling O1</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="demo-mode" style="width: auto;">
+                            <span>Demo Mode (Use placeholder videos, no credits needed)</span>
+                        </label>
+                    </div>
+
+                    <div class="credit-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Video generation requires 60-90 credits. Check your balance at <a href="https://thankyouai.com/dashboard" target="_blank">thankyouai.com/dashboard</a></span>
+                    </div>
+                    <button class="btn btn-primary btn-save-settings" id="save-settings-btn">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
             </div>
         </div>
     </div>
