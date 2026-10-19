@@ -2,506 +2,314 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stark Video AI - Free AI Video Generation</title>
-    <meta name="description" content="Create high-quality AI videos with Stark's advanced technology. Convert text to video in seconds.">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Stark Video AI - Free text-to-video</title>
+    <meta name="description" content="Type a sentence, get a short AI video. Free, no sign-up, runs in your browser.">
+    <meta name="theme-color" content="#f2f3f7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#11131f" media="(prefers-color-scheme: dark)">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/x-icon" href="https://img.icons8.com/color/96/000000/video.png">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235b4bff'/%3E%3Cpath d='M12 9l11 7-11 7z' fill='white'/%3E%3C/svg%3E">
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-brand">
-                <div class="logo">
-                    <i class="fas fa-bolt"></i>
-                    <span>STARK</span>
-                </div>
-                <div class="brand-subtitle">Video AI</div>
-            </div>
-            
-            <ul class="nav-links">
-                <li><a href="#home" class="active">Home</a></li>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#how-it-works">How It Works</a></li>
-                <li><a href="#examples">Examples</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-            </ul>
-            
-            <div class="nav-actions">
-                <div class="demo-mode-indicator" id="demo-mode-indicator" style="display: none;">
-                    <i class="fas fa-play-circle"></i> Demo Mode
-                </div>
-                <button class="btn btn-outline" id="settings-btn" title="Click to add API key or enable Demo Mode">
-                    <i class="fas fa-cog"></i> Settings <span class="settings-hint">(Engine)</span>
-                </button>
-                <button class="btn btn-primary" id="try-free-btn">
-                    <i class="fas fa-play-circle"></i> Try For Free
-                </button>
-            </div>
-            
-            <button class="mobile-menu-btn" id="mobile-menu-btn">
-                <i class="fas fa-bars"></i>
+    <!-- Reusable icons -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></symbol>
+        <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z M19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7.6 7.6 0 0 1-2 1.2l-.3 2h-4l-.3-2a7.6 7.6 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7.7 7.7 0 0 1 0-3L2.6 9.3l2-3.4 1.9.7a7.6 7.6 0 0 1 2-1.2l.3-2h4l.3 2a7.6 7.6 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7.7 7.7 0 0 1 0 3Z"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></symbol>
+        <symbol id="i-share" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V4m0 0L8 8m4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12"/></symbol>
+        <symbol id="i-image" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4.5 5h15v14h-15z M4.5 16l4.5-4.5 3.5 3.5 2.5-2.5 4.5 4.5 M15.5 9.5h.01"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+        <symbol id="i-redo" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19 5v5h-5 M19 10a7.5 7.5 0 1 0 1.5 5"/></symbol>
+    </svg>
+
+    <a class="skip-link" href="#prompt">Skip to the video maker</a>
+
+    <header class="site-header">
+        <div class="wrap header-inner">
+            <a class="brand" href="#top" aria-label="Stark Video AI home">
+                <span class="brand-mark" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+                <span class="brand-name">Stark</span>
+            </a>
+            <nav class="main-nav" aria-label="Main">
+                <a href="#how">How it works</a>
+                <a href="#tips">Prompt tips</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <button class="engine-button" id="settings-btn" type="button" aria-haspopup="dialog">
+                <span class="engine-dot" aria-hidden="true"></span>
+                <span id="engine-badge">Free engine</span>
+                <svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>
+                <span class="visually-hidden">Open settings</span>
             </button>
-
-            <!-- Mobile Menu -->
-            <div class="mobile-menu" id="mobile-menu">
-                <ul class="mobile-nav-links">
-                    <li><a href="#home">Home</a></li>
-                    <li><a href="#features">Features</a></li>
-                    <li><a href="#how-it-works">How It Works</a></li>
-                    <li><a href="#examples">Examples</a></li>
-                    <li><a href="#pricing">Pricing</a></li>
-                    <li class="mobile-settings-link">
-                        <button class="btn btn-outline" id="mobile-settings-btn">
-                            <i class="fas fa-cog"></i> Settings
-                        </button>
-                    </li>
-                </ul>
-            </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Hero Section -->
-    <section class="hero" id="home">
-        <div class="hero-container">
-            <div class="hero-content">
-                <div class="badge">
-                    <i class="fas fa-bolt"></i> LEADING AI TECHNOLOGY
-                </div>
-                <h1 class="hero-title">Create <span class="gradient-text">Stunning Videos</span> From Text</h1>
-                <p class="hero-subtitle">Stark Video AI transforms your ideas into high-quality videos using advanced AI technology. Just enter a description and watch the magic happen.</p>
-                
-                <div class="hero-stats">
-                    <div class="stat">
-                        <div class="stat-number">10,000+</div>
-                        <div class="stat-label">Videos Created</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">99%</div>
-                        <div class="stat-label">Satisfaction Rate</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">30s</div>
-                        <div class="stat-label">Generation Time</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="hero-video-preview">
-                <div class="video-placeholder">
-                    <div class="video-player">
-                        <div class="play-btn">
-                            <i class="fas fa-play"></i>
+    <main id="top">
+        <!-- ===== Studio: the generator is the hero ===== -->
+        <section class="studio wrap" aria-labelledby="studio-title">
+            <div class="studio-controls">
+                <h1 id="studio-title">Turn a sentence into a video.</h1>
+                <p class="lede">Describe a scene and get a short AI clip in about a minute. Free, no sign-up.</p>
+
+                <form class="maker" id="maker" novalidate>
+                    <div class="field">
+                        <div class="field-head">
+                            <label for="prompt">What should happen in the video?</label>
+                            <span class="char-count" id="char-count" aria-live="polite">0 / 500</span>
                         </div>
-                        <div class="video-title">Video Generated by Stark AI</div>
-                        <div class="video-overlay">
-                            <div class="loading-animation">
-                                <div class="spinner"></div>
-                                <p>AI Processing...</p>
+                        <textarea id="prompt" rows="4" maxlength="500" placeholder="A red fox trots through fresh snow in a pine forest at sunrise, slow camera pan, soft golden light"></textarea>
+                        <div class="ideas" aria-label="Prompt ideas">
+                            <span class="ideas-label">Try:</span>
+                            <button type="button" class="idea" data-prompt="Waves crash against black volcanic rocks at sunset, slow-motion spray, wide drone shot">Ocean at sunset</button>
+                            <button type="button" class="idea" data-prompt="A paper boat floats down a rainy city street gutter, neon reflections, close-up tracking shot">Paper boat in the rain</button>
+                            <button type="button" class="idea" data-prompt="A cup of coffee on a wooden table, steam rising, morning light through a window, macro shot">Morning coffee</button>
+                            <button type="button" class="idea" data-prompt="An astronaut walks slowly across a red desert planet, two moons in the sky, cinematic wide shot">Astronaut on Mars</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-row">
+                        <fieldset class="field">
+                            <legend>Shape</legend>
+                            <div class="segmented" id="aspect-group">
+                                <label><input type="radio" name="aspect" value="16:9" checked><span><i class="shape shape-wide" aria-hidden="true"></i>Wide</span></label>
+                                <label><input type="radio" name="aspect" value="9:16"><span><i class="shape shape-tall" aria-hidden="true"></i>Tall</span></label>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="field">
+                            <legend>Length</legend>
+                            <div class="segmented" id="length-group"><!-- filled by script --></div>
+                        </fieldset>
+
+                        <div class="field">
+                            <label for="style">Look</label>
+                            <div class="select-wrap">
+                                <select id="style">
+                                    <option value="realistic">Realistic</option>
+                                    <option value="cinematic">Cinematic</option>
+                                    <option value="anime">Anime</option>
+                                    <option value="3d-animation">3D animation</option>
+                                    <option value="artistic">Painterly</option>
+                                    <option value="cartoon">Cartoon</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Video Generator Section -->
-    <section class="generator-section">
-        <div class="container">
-            <div class="section-header">
-                <h2><i class="fas fa-wand-magic-sparkles"></i> Generate Video Now</h2>
-                <p>Enter a detailed description for AI to create your video</p>
-            </div>
-            
-            <div class="generator-container">
-                <div class="input-section">
-                    <div class="input-header">
-                        <h3><i class="fas fa-keyboard"></i> Describe Your Video</h3>
-                        <div class="char-count" id="char-count">0/500</div>
-                    </div>
-
-                    <div class="setup-guide" id="setup-guide">
-                        <div class="setup-guide-content">
-                            <i class="fas fa-rocket"></i>
-                            <div class="setup-guide-text">
-                                <h4>Choose an engine</h4>
-                                <p>The free engine (LTX-Video on Hugging Face) is ready to use, with no key needed. For Google Veo, add a paid Gemini API key in Settings.</p>
-                                <button class="btn btn-primary btn-sm" id="open-settings-btn">
-                                    <i class="fas fa-cog"></i> Open Settings
-                                </button>
+                        <fieldset class="field" id="resolution-field" hidden>
+                            <legend>Quality</legend>
+                            <div class="segmented" id="resolution-group">
+                                <label><input type="radio" name="resolution" value="720p" checked><span>720p</span></label>
+                                <label><input type="radio" name="resolution" value="1080p"><span>1080p</span></label>
+                                <label><input type="radio" name="resolution" value="4k"><span>4K</span></label>
                             </div>
-                        </div>
+                        </fieldset>
                     </div>
 
-                    <div class="api-notice" id="api-notice" style="display: none;">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <span>API key not configured. <a href="#" id="configure-api-link">Click here to set up</a> or enable Demo Mode in Settings.</span>
-                    </div>
-                    
-                    <textarea 
-                        id="video-prompt" 
-                        class="prompt-input" 
-                        placeholder="Example: A panda eating bamboo on a mountain in the early morning with sunlight shining through mist, beautiful natural scenery..."
-                        maxlength="500"
-                    ></textarea>
-                    
-                    <div class="input-options">
-                        <div class="option-group">
-                            <label for="video-style"><i class="fas fa-palette"></i> Video Style</label>
-                            <select id="video-style" class="style-select">
-                                <option value="realistic">Realistic</option>
-                                <option value="cinematic">Cinematic</option>
-                                <option value="anime">Anime</option>
-                                <option value="3d-animation">3D Animation</option>
-                                <option value="artistic">Artistic</option>
-                                <option value="cartoon">Cartoon</option>
-                            </select>
-                        </div>
-
-                        <div class="option-group">
-                            <label for="video-length"><i class="fas fa-clock"></i> Video Length</label>
-                            <select id="video-length" class="length-select">
-                                <option value="3">3 seconds</option>
-                            </select>
-                        </div>
-
-                        <div class="option-group">
-                            <label for="aspect-ratio"><i class="fas fa-expand"></i> Aspect Ratio</label>
-                            <select id="aspect-ratio" class="ratio-select">
-                                <option value="16:9">16:9 (Widescreen)</option>
-                                <option value="9:16">9:16 (Vertical / Shorts)</option>
-                            </select>
-                        </div>
-
-                        <div class="option-group" id="resolution-group">
-                            <label for="video-resolution"><i class="fas fa-tv"></i> Resolution</label>
-                            <select id="video-resolution" class="style-select">
-                                <option value="720p">720p (fastest)</option>
-                                <option value="1080p">1080p (8s only)</option>
-                                <option value="4k">4K (8s only)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="image-upload" id="image-upload">
-                        <label class="image-upload-label" for="start-image">
-                            <i class="fas fa-image"></i>
-                            <span id="image-upload-text">Optional: add a starting image (image-to-video)</span>
+                    <div class="attach">
+                        <label class="attach-button" for="start-image">
+                            <svg class="icon" aria-hidden="true"><use href="#i-image"/></svg>
+                            <span id="attach-text">Start from a photo (optional)</span>
                         </label>
-                        <input type="file" id="start-image" accept="image/png,image/jpeg,image/webp" hidden>
-                        <div class="image-preview" id="image-preview" hidden>
-                            <img id="image-preview-img" alt="Starting frame preview">
-                            <button type="button" class="image-remove" id="image-remove" title="Remove image">&times;</button>
+                        <input type="file" id="start-image" accept="image/png,image/jpeg,image/webp" class="visually-hidden">
+                        <div class="attach-preview" id="attach-preview" hidden>
+                            <img id="attach-img" alt="Selected starting photo">
+                            <button type="button" id="attach-remove" aria-label="Remove photo"><svg class="icon"><use href="#i-close"/></svg></button>
                         </div>
                     </div>
 
-                    <button class="btn btn-generate" id="generate-btn">
-                        <i class="fas fa-bolt"></i> Generate Video
+                    <button class="generate" id="generate-btn" type="submit">
+                        <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
+                        <span id="generate-label">Make video</span>
                     </button>
-                    
-                    <div class="disclaimer">
-                        <i class="fas fa-info-circle"></i> By generating video, you agree to our <a href="#">Terms of Service</a> and confirm content complies with <a href="#">Content Policy</a>.
-                    </div>
-                </div>
-                
-                <div class="output-section">
-                    <div class="output-header">
-                        <h3><i class="fas fa-video"></i> Your Video</h3>
-                        <div class="output-actions">
-                            <button class="btn-icon" id="download-btn" disabled>
-                                <i class="fas fa-download"></i>
-                            </button>
-                            <button class="btn-icon" id="share-btn" disabled>
-                                <i class="fas fa-share"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="video-output" id="video-output">
-                        <div class="output-placeholder">
-                            <div class="placeholder-icon">
-                                <i class="fas fa-film"></i>
-                            </div>
-                            <h4>Your Video Will Appear Here</h4>
-                            <p>Enter description and click "Generate Video" to start</p>
-                        </div>
-                        
-                        <div class="generation-progress" id="progress-container">
-                            <div class="progress-header">
-                                <h4><span id="progress-title">Generating video</span> <span class="progress-elapsed" id="progress-elapsed">0:00</span></h4>
-                                <div class="progress-percent" id="progress-percent">0%</div>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progress-fill"></div>
-                            </div>
-                            <div class="progress-steps">
-                                <div class="step active"><i class="fas fa-paper-plane"></i> Sending Request</div>
-                                <div class="step"><i class="fas fa-brain"></i> AI Generating Video</div>
-                                <div class="step"><i class="fas fa-cloud-download-alt"></i> Downloading Video</div>
-                                <div class="step"><i class="fas fa-check-circle"></i> Ready to Play</div>
-                            </div>
-                            <p class="progress-note" id="progress-note">Keep this tab open.</p>
-                        </div>
-                        
-                        <div class="video-result" id="video-result">
-                            <video controls id="generated-video">
-                                <source src="" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                            <div class="video-info">
-                                <h4 id="video-title">Generated Video</h4>
-                                <div class="video-details">
-                                    <span><i class="fas fa-clock"></i> <span id="video-duration">8s</span></span>
-                                    <span><i class="fas fa-palette"></i> <span id="video-style-result">Realistic</span></span>
-                                    <span><i class="fas fa-expand"></i> <span id="video-ratio">16:9</span></span>
-                                    <span><i class="fas fa-microchip"></i> <span id="video-model">LTX-Video</span></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <p class="hint" id="generate-hint">Free engine: LTX-Video on Hugging Face. Ctrl + Enter also works.</p>
+                </form>
             </div>
-        </div>
-    </section>
 
-    <!-- Features Section -->
-    <section class="features-section" id="features">
-        <div class="container">
-            <div class="section-header">
-                <h2><i class="fas fa-star"></i> Stark's Advanced Technology</h2>
-                <p>Discover breakthrough features that make Stark the best AI video platform</p>
-            </div>
-            
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                    <h3>Lightning Fast</h3>
-                    <p>Free text-to-video with LTX-Video on Hugging Face, or premium quality with Google Veo 3.1.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-eye"></i>
-                    </div>
-                    <h3>4K Quality</h3>
-                    <p>Free clips in seconds, or up to 4K with native audio when you use Google Veo.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-language"></i>
-                    </div>
-                    <h3>Multi-Language Support</h3>
-                    <p>Write prompts in English for best results; other languages such as Vietnamese also work with varying quality.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-sliders-h"></i>
-                    </div>
-                    <h3>Advanced Customization</h3>
-                    <p>Control style, length, aspect ratio and resolution, or animate your own starting image.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+            <!-- ===== Viewfinder ===== -->
+            <div class="studio-output">
+                <div class="viewfinder" id="viewfinder" data-state="empty" data-aspect="16:9" aria-live="polite">
+                    <span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
+                    <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
 
-    <!-- How It Works Section -->
-    <section class="how-it-works" id="how-it-works">
-        <div class="container">
-            <div class="section-header">
-                <h2><i class="fas fa-cogs"></i> How Stark Works</h2>
-                <p>Simple 4-step process to create high-quality AI videos</p>
-            </div>
-            
-            <div class="steps-container">
-                <div class="step-item">
-                    <div class="step-number">1</div>
-                    <div class="step-content">
-                        <h3>Enter Description</h3>
-                        <p>Describe your video content in detail. The more detailed, the more accurate the video.</p>
+                    <div class="vf-hud" aria-hidden="true">
+                        <span class="rec"><span class="rec-dot"></span><span id="rec-label">STBY</span></span>
+                        <span class="vf-meta" id="vf-meta">16:9  3s</span>
+                        <span class="rec-time" id="rec-time">00:00</span>
                     </div>
-                </div>
-                
-                <div class="step-item">
-                    <div class="step-number">2</div>
-                    <div class="step-content">
-                        <h3>AI Analysis</h3>
-                        <p>Your prompt goes to the free LTX-Video model on Hugging Face, or to Google Veo if you choose it.</p>
-                    </div>
-                </div>
-                
-                <div class="step-item">
-                    <div class="step-number">3</div>
-                    <div class="step-content">
-                        <h3>Create Images & Motion</h3>
-                        <p>The AI generates the frames and motion. Free videos usually take under a minute plus any queue.</p>
-                    </div>
-                </div>
-                
-                <div class="step-item">
-                    <div class="step-number">4</div>
-                    <div class="step-content">
-                        <h3>Finalize Video</h3>
-                        <p>Watch, download or share your MP4 right away.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <div class="container">
-            <div class="cta-content">
-                <h2>Ready to Create Professional AI Videos?</h2>
-                <p>Type a prompt and make your first AI video for free, no sign-up required.</p>
-                <button class="btn btn-cta" id="signup-btn">
-                    <i class="fas fa-rocket"></i> Start Free Trial
-                </button>
-                <p class="cta-note">Free engine powered by LTX-Video on Hugging Face.</p>
-            </div>
-        </div>
-    </section>
+                    <div class="vf-layer vf-empty">
+                        <p class="vf-title">Your video shows up here</p>
+                        <p class="vf-sub">Write a prompt, then press Make video.</p>
+                    </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <div class="logo">
-                        <i class="fas fa-bolt"></i>
-                        <span>STARK</span>
+                    <div class="vf-layer vf-working">
+                        <p class="vf-title" id="status-text">Connecting…</p>
+                        <p class="vf-sub" id="status-detail">Keep this tab open.</p>
+                        <div class="progress" role="progressbar" aria-label="Video progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+                            <span class="progress-fill" id="progress-fill"></span>
+                        </div>
+                        <button type="button" class="link-button" id="cancel-btn">Cancel</button>
                     </div>
-                    <div class="brand-subtitle">Video AI</div>
-                    <p class="footer-description">Advanced AI technology for text-to-video generation. Fast, high-quality, easy to use.</p>
-                    <div class="social-links">
-                        <a href="#"><i class="fab fa-twitter"></i></a>
-                        <a href="#"><i class="fab fa-facebook"></i></a>
-                        <a href="#"><i class="fab fa-linkedin"></i></a>
-                        <a href="#"><i class="fab fa-youtube"></i></a>
-                        <a href="#"><i class="fab fa-github"></i></a>
+
+                    <div class="vf-layer vf-error">
+                        <p class="vf-title">The video wasn't made</p>
+                        <p class="vf-sub" id="error-text"></p>
+                        <button type="button" class="pill-button" id="retry-btn"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg>Try again</button>
+                    </div>
+
+                    <video id="video" class="vf-video" controls playsinline loop preload="metadata"></video>
+                </div>
+
+                <div class="output-bar" id="output-bar" hidden>
+                    <p class="output-caption" id="output-caption"></p>
+                    <div class="output-actions">
+                        <button type="button" class="pill-button" id="download-btn"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Download</button>
+                        <button type="button" class="pill-button ghost" id="share-btn"><svg class="icon" aria-hidden="true"><use href="#i-share"/></svg>Share</button>
                     </div>
                 </div>
-                
-                <div class="footer-links">
-                    <div class="link-column">
-                        <h4>Product</h4>
-                        <a href="#">Features</a>
-                        <a href="#">Pricing</a>
-                        <a href="#">API for Developers</a>
-                        <a href="#">Download App</a>
-                    </div>
-                    
-                    <div class="link-column">
-                        <h4>Resources</h4>
-                        <a href="#">Documentation</a>
-                        <a href="#">Blog</a>
-                        <a href="#">Video Examples</a>
-                        <a href="#">Support</a>
-                    </div>
-                    
-                    <div class="link-column">
-                        <h4>Company</h4>
-                        <a href="#">About Us</a>
-                        <a href="#">Careers</a>
-                        <a href="#">Contact</a>
-                        <a href="#">Terms of Service</a>
-                    </div>
+
+                <div class="history" id="history-wrap" hidden>
+                    <h2 class="history-title">Made this visit</h2>
+                    <ul class="history-list" id="history"></ul>
+                    <p class="hint">These disappear when you close the tab. Download the ones you want to keep.</p>
                 </div>
             </div>
-            
-            <div class="footer-bottom">
-                <p>&copy; <span id="year">2026</span> Stark Video AI. All rights reserved.</p>
-                <div class="footer-stats">
-                    <span id="visit-count"><i class="fas fa-users"></i> 12,458 active users</span>
-                    <span id="current-time"><i class="fas fa-clock"></i> Loading time...</span>
+        </section>
+
+        <!-- ===== How it works (a real sequence) ===== -->
+        <section class="band" id="how" aria-labelledby="how-title">
+            <div class="wrap">
+                <h2 id="how-title">How it works</h2>
+                <ol class="steps">
+                    <li>
+                        <h3>Describe the shot</h3>
+                        <p>Say who or what is in it, what happens, where, and how the camera moves.</p>
+                    </li>
+                    <li>
+                        <h3>An AI model films it</h3>
+                        <p>Your prompt goes to LTX-Video, an open model running on a free Hugging Face GPU. If others are using it, you wait in a short queue.</p>
+                    </li>
+                    <li>
+                        <h3>Watch and download</h3>
+                        <p>The MP4 plays right here. Download it before you close the tab.</p>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- ===== Prompt tips ===== -->
+        <section class="wrap tips" id="tips" aria-labelledby="tips-title">
+            <h2 id="tips-title">Prompt tips</h2>
+            <p class="section-lede">The model only knows what you tell it. Short, vague prompts give vague clips.</p>
+            <div class="compare">
+                <figure class="prompt-card weak">
+                    <figcaption>Vague</figcaption>
+                    <blockquote>a dog</blockquote>
+                </figure>
+                <figure class="prompt-card strong">
+                    <figcaption>Specific</figcaption>
+                    <blockquote>A golden retriever puppy runs across a sunny meadow toward the camera, ears flapping, low tracking shot, shallow depth of field</blockquote>
+                    <button type="button" class="link-button use-prompt" data-prompt="A golden retriever puppy runs across a sunny meadow toward the camera, ears flapping, low tracking shot, shallow depth of field">Use this prompt</button>
+                </figure>
+            </div>
+            <ul class="tip-list">
+                <li><strong>Subject and action.</strong> "A cyclist rides" beats "a bike".</li>
+                <li><strong>Setting and light.</strong> Time of day, weather, indoor or outdoor.</li>
+                <li><strong>Camera.</strong> Close-up, wide shot, slow pan, drone shot, tracking shot.</li>
+                <li><strong>English works best.</strong> Other languages work, but less reliably.</li>
+            </ul>
+        </section>
+
+        <!-- ===== FAQ ===== -->
+        <section class="band" id="faq" aria-labelledby="faq-title">
+            <div class="wrap faq-wrap">
+                <h2 id="faq-title">Questions</h2>
+                <div class="faq">
+                    <details>
+                        <summary>Is it really free?</summary>
+                        <p>Yes. The default engine runs on Hugging Face's free GPUs. Each visitor gets a limited amount of free GPU time; when it runs out, wait a while or add a free Hugging Face token in Settings for more.</p>
+                    </details>
+                    <details>
+                        <summary>Why does it sometimes wait in a queue?</summary>
+                        <p>The free server is shared with everyone using it. The viewfinder shows your place in line.</p>
+                    </details>
+                    <details>
+                        <summary>How long can videos be?</summary>
+                        <p>2 to 5 seconds on the free engine. Google Veo (paid) makes 4 to 8 second clips with sound, up to 4K.</p>
+                    </details>
+                    <details>
+                        <summary>Can I use Google Veo instead?</summary>
+                        <p>Yes. Open Settings, pick a Veo engine and paste a Gemini API key from a Google Cloud project with billing turned on. You pay Google per second of video.</p>
+                    </details>
+                    <details>
+                        <summary>Where do my prompts and keys go?</summary>
+                        <p>Prompts go to the engine you choose (Hugging Face or Google). Keys are saved only in your own browser and are sent only to that engine.</p>
+                    </details>
                 </div>
             </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap footer-inner">
+            <p>© <span id="year">2026</span> Stark Video AI. Free engine: <a href="https://huggingface.co/spaces/Lightricks/ltx-video-distilled" target="_blank" rel="noopener">LTX-Video by Lightricks</a>.</p>
+            <label class="demo-toggle"><input type="checkbox" id="demo-mode-footer"> Demo mode</label>
         </div>
     </footer>
 
-    <!-- Video Modal -->
-    <div class="modal" id="video-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Video Generated by Stark AI</h3>
-                <button class="close-modal" id="close-modal">&times;</button>
+    <!-- ===== Settings dialog ===== -->
+    <div class="modal" id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+        <div class="modal-backdrop" data-close></div>
+        <div class="modal-panel">
+            <div class="modal-head">
+                <h2 id="settings-title">Settings</h2>
+                <button type="button" class="icon-button" data-close aria-label="Close settings"><svg class="icon"><use href="#i-close"/></svg></button>
             </div>
-            <div class="modal-body">
-                <video controls id="modal-video">
-                    <source src="" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-    </div>
 
-    <!-- Settings Modal -->
-    <div class="modal" id="settings-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-cog"></i> API Settings</h3>
-                <button class="close-modal" id="close-settings-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="settings-form">
-                    <div class="form-group">
-                        <label for="engine-select">
-                            <i class="fas fa-microchip"></i> Video Engine
-                        </label>
-                        <select id="engine-select" class="settings-select">
-                            <option value="free">LTX-Video on Hugging Face (free)</option>
-                            <option value="veo-3.1-lite-generate-preview">Google Veo 3.1 Lite (paid)</option>
-                            <option value="veo-3.1-fast-generate-preview">Google Veo 3.1 Fast (paid)</option>
-                            <option value="veo-3.1-generate-preview">Google Veo 3.1 (paid, best quality)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" id="hf-settings">
-                        <label for="hf-token">
-                            <i class="fas fa-key"></i> Hugging Face Token <span class="optional-tag">(optional)</span>
-                        </label>
-                        <input type="password" id="hf-token" class="settings-input" placeholder="hf_..." autocomplete="off" />
-                        <p class="settings-help">
-                            Works without a token. If you hit the free GPU limit, create a free account and token at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> ("Read" access) for more free usage.
-                        </p>
-                    </div>
-
-                    <div class="form-group" id="veo-settings">
-                        <label for="api-key">
-                            <i class="fas fa-key"></i> Google Gemini API Key
-                        </label>
-                        <input type="password" id="api-key" class="settings-input" placeholder="AIza..." autocomplete="off" />
-                        <p class="settings-help">
-                            Veo needs a key with billing enabled, from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
-                        </p>
-                    </div>
-
-                    <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="demo-mode" style="width: auto;">
-                            <span>Demo Mode (sample videos, no AI calls)</span>
-                        </label>
-                    </div>
-
-                    <div class="credit-info">
-                        <i class="fas fa-info-circle"></i>
-                        <span>Keys are saved only in this browser. On a public site, anyone using your page uses your own key, so the free engine is the safest choice.</span>
-                    </div>
-                    <button class="btn btn-primary btn-save-settings" id="save-settings-btn">
-                        <i class="fas fa-save"></i> Save Settings
-                    </button>
+            <fieldset class="field">
+                <legend>Video engine</legend>
+                <div class="engine-options" id="engine-options">
+                    <label class="engine-option"><input type="radio" name="engine" value="free" checked>
+                        <span><strong>LTX-Video</strong><em>Free, 2–5 s, no sound</em></span></label>
+                    <label class="engine-option"><input type="radio" name="engine" value="veo-3.1-lite-generate-preview">
+                        <span><strong>Google Veo 3.1 Lite</strong><em>Paid, with sound</em></span></label>
+                    <label class="engine-option"><input type="radio" name="engine" value="veo-3.1-fast-generate-preview">
+                        <span><strong>Google Veo 3.1 Fast</strong><em>Paid, with sound</em></span></label>
+                    <label class="engine-option"><input type="radio" name="engine" value="veo-3.1-generate-preview">
+                        <span><strong>Google Veo 3.1</strong><em>Paid, best quality</em></span></label>
                 </div>
+            </fieldset>
+
+            <div class="field" id="hf-fields">
+                <label for="hf-token">Hugging Face token <span class="optional">optional</span></label>
+                <input type="password" id="hf-token" placeholder="hf_…" autocomplete="off" spellcheck="false">
+                <p class="hint">Gives you more free GPU time. Create a free "Read" token at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a>.</p>
+            </div>
+
+            <div class="field" id="veo-fields" hidden>
+                <label for="api-key">Gemini API key</label>
+                <input type="password" id="api-key" placeholder="AIza…" autocomplete="off" spellcheck="false">
+                <p class="hint">Needs billing turned on. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</p>
+            </div>
+
+            <label class="check">
+                <input type="checkbox" id="demo-mode">
+                <span>Demo mode: play sample clips instead of calling an engine</span>
+            </label>
+
+            <p class="hint">Keys stay in this browser. On a public site, the free engine is the safe choice.</p>
+
+            <div class="modal-actions">
+                <button type="button" class="pill-button ghost" data-close>Cancel</button>
+                <button type="button" class="pill-button" id="save-settings-btn">Save settings</button>
             </div>
         </div>
     </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
 
     <script src="script.js"></script>
 </body>

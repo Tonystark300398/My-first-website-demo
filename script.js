@@ -2,29 +2,29 @@
 // Engines:
 //   - "free": LTX-Video on Hugging Face Spaces (Lightricks/ltx-video-distilled) via @gradio/client
 //   - Google Veo 3.1 through the Gemini API (paid key): https://ai.google.dev/gemini-api/docs/veo
-document.addEventListener('DOMContentLoaded', () => {
+(function () {
     'use strict';
 
     // ==================== CONFIG ====================
-    const API_CONFIG = {
-        BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-        API_KEY: '',                               // Gemini key, set via Settings (saved in localStorage)
-        HF_TOKEN: '',                              // Optional Hugging Face token for more free GPU time
-        ENGINE: 'free',                            // 'free' or a Veo model id
+    var CONFIG = {
+        GEMINI_BASE: 'https://generativelanguage.googleapis.com/v1beta',
         HF_SPACE: 'Lightricks/ltx-video-distilled',
         GRADIO_CLIENT_URL: 'https://cdn.jsdelivr.net/npm/@gradio/client@2.5.0/dist/index.min.js',
-        POLL_INTERVAL: 10000,                      // Google recommends polling every ~10s
-        MAX_WAIT_MS: 12 * 60 * 1000                // Give up after 12 minutes
+        VEO_POLL_MS: 10000,
+        MAX_WAIT_MS: 12 * 60 * 1000
     };
 
-    const MODEL_NAMES = {
-        free: 'LTX-Video (free)',
-        'veo-3.1-generate-preview': 'Veo 3.1',
-        'veo-3.1-fast-generate-preview': 'Veo 3.1 Fast',
-        'veo-3.1-lite-generate-preview': 'Veo 3.1 Lite'
+    var ENGINES = {
+        free: { label: 'Free engine', name: 'LTX-Video' },
+        'veo-3.1-lite-generate-preview': { label: 'Veo 3.1 Lite', name: 'Veo 3.1 Lite' },
+        'veo-3.1-fast-generate-preview': { label: 'Veo 3.1 Fast', name: 'Veo 3.1 Fast' },
+        'veo-3.1-generate-preview': { label: 'Veo 3.1', name: 'Veo 3.1' }
     };
 
-    const STYLE_HINTS = {
+    var DURATIONS = { free: ['2', '3', '4', '5'], veo: ['4', '6', '8'] };
+    var FREE_SIZES = { '16:9': [704, 480], '9:16': [480, 704] };
+
+    var STYLE_HINTS = {
         realistic: 'Photorealistic, natural lighting, realistic detail.',
         cinematic: 'Cinematic film look, dramatic lighting, shallow depth of field, smooth camera movement.',
         anime: 'Japanese anime style, cel-shaded, vibrant colors.',
@@ -33,741 +33,693 @@ document.addEventListener('DOMContentLoaded', () => {
         cartoon: '2D cartoon style, bold outlines, bright playful colors.'
     };
 
-    // Durations offered per engine
-    const DURATIONS = {
-        free: [['2', '2 seconds'], ['3', '3 seconds'], ['4', '4 seconds'], ['5', '5 seconds']],
-        veo: [['4', '4 seconds'], ['6', '6 seconds'], ['8', '8 seconds']]
-    };
-
-    // Frame sizes for the free engine (multiples of 32)
-    const FREE_SIZES = { '16:9': [704, 480], '9:16': [480, 704] };
-
-    const DEMO_VIDEOS = [
+    var DEMO_VIDEOS = [
         'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
         'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
     ];
 
     // ==================== STATE ====================
-    const state = {
-        isGenerating: false,
-        demoMode: false,
-        abort: null,              // AbortController for the current job
-        progressTimer: null,
-        elapsedTimer: null,
+    var settings = { engine: 'free', hfToken: '', apiKey: '', demo: false };
+    var state = {
+        busy: false,
+        abort: null,
         startTime: 0,
-        currentVideoUrl: null,    // blob: URL (or remote URL in demo mode)
-        currentVideoBlob: null,
-        startImage: null          // { mimeType, data (base64), dataUrl }
+        clockTimer: null,
+        progressTimer: null,
+        startImage: null,     // { mimeType, data, dataUrl }
+        history: [],          // [{ url, blob, prompt, meta }]
+        current: -1,
+        lastFocus: null
     };
 
     // ==================== DOM ====================
-    const $ = (id) => document.getElementById(id);
-    const el = {
-        prompt: $('video-prompt'),
-        style: $('video-style'),
-        length: $('video-length'),
-        aspect: $('aspect-ratio'),
-        resolution: $('video-resolution'),
-        resolutionGroup: $('resolution-group'),
-        engineSelect: $('engine-select'),
-        hfTokenInput: $('hf-token'),
-        hfSettings: $('hf-settings'),
-        veoSettings: $('veo-settings'),
-        progressTitle: $('progress-title'),
-        startImageInput: $('start-image'),
-        imageUploadText: $('image-upload-text'),
-        imagePreview: $('image-preview'),
-        imagePreviewImg: $('image-preview-img'),
-        imageRemove: $('image-remove'),
-        generateBtn: $('generate-btn'),
-        downloadBtn: $('download-btn'),
-        shareBtn: $('share-btn'),
-        settingsBtn: $('settings-btn'),
-        mobileSettingsBtn: $('mobile-settings-btn'),
-        saveSettingsBtn: $('save-settings-btn'),
-        mobileMenuBtn: $('mobile-menu-btn'),
-        mobileMenu: $('mobile-menu'),
-        tryFreeBtn: $('try-free-btn'),
-        signupBtn: $('signup-btn'),
-        settingsModal: $('settings-modal'),
-        closeSettingsModal: $('close-settings-modal'),
-        apiKeyInput: $('api-key'),
+    function $(id) { return document.getElementById(id); }
+    var el = {};
 
-        demoModeCheckbox: $('demo-mode'),
-        demoModeIndicator: $('demo-mode-indicator'),
-        setupGuide: $('setup-guide'),
-        openSettingsBtn: $('open-settings-btn'),
-        apiNotice: $('api-notice'),
-        configureApiLink: $('configure-api-link'),
-        progressContainer: $('progress-container'),
-        progressFill: $('progress-fill'),
-        progressPercent: $('progress-percent'),
-        progressElapsed: $('progress-elapsed'),
-        progressNote: $('progress-note'),
-        videoResult: $('video-result'),
-        generatedVideo: $('generated-video'),
-        outputPlaceholder: document.querySelector('.output-placeholder'),
-        charCount: $('char-count'),
-        currentTime: $('current-time'),
-        year: $('year')
-    };
-
-    const PLACEHOLDER_HTML = el.outputPlaceholder ? el.outputPlaceholder.innerHTML : '';
+    function cacheDom() {
+        [
+            'maker', 'prompt', 'char-count', 'style', 'length-group', 'resolution-field', 'resolution-group',
+            'start-image', 'attach-text', 'attach-preview', 'attach-img', 'attach-remove',
+            'generate-btn', 'generate-label', 'generate-hint',
+            'viewfinder', 'rec-label', 'rec-time', 'vf-meta', 'status-text', 'status-detail',
+            'progress', 'progress-fill', 'cancel-btn', 'error-text', 'retry-btn', 'video',
+            'output-bar', 'output-caption', 'download-btn', 'share-btn', 'history-wrap', 'history',
+            'settings-btn', 'engine-badge', 'settings', 'hf-token', 'api-key', 'demo-mode', 'demo-mode-footer',
+            'hf-fields', 'veo-fields', 'save-settings-btn', 'toasts', 'year'
+        ].forEach(function (id) {
+            el[id.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); })] = $(id);
+        });
+    }
 
     // ==================== INIT ====================
     function init() {
+        cacheDom();
         loadSettings();
-        bindEvents();
-        updateCharCounter();
+        renderLengths();
         applyEngineUI();
-        checkApiKeyStatus();
-        startClock();
-        if (el.year) el.year.textContent = new Date().getFullYear();
+        bindEvents();
+        updateCharCount();
+        updateMeta();
+        if (el.year) el.year.textContent = String(new Date().getFullYear());
     }
 
     function bindEvents() {
-        el.generateBtn?.addEventListener('click', handleGenerate);
-        el.downloadBtn?.addEventListener('click', downloadVideo);
-        el.shareBtn?.addEventListener('click', shareVideo);
-        el.prompt?.addEventListener('input', updateCharCounter);
-        el.prompt?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleGenerate();
+        el.maker.addEventListener('submit', function (e) { e.preventDefault(); generate(); });
+        el.prompt.addEventListener('input', updateCharCount);
+        el.prompt.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); generate(); }
         });
-        el.resolution?.addEventListener('change', enforceResolutionRules);
 
-        // Image-to-video
-        el.startImageInput?.addEventListener('change', handleImageSelected);
-        el.imageRemove?.addEventListener('click', clearStartImage);
+        document.querySelectorAll('[data-prompt]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                el.prompt.value = b.getAttribute('data-prompt');
+                updateCharCount();
+                if (b.classList.contains('use-prompt')) {
+                    document.querySelector('.studio').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                el.prompt.focus({ preventScroll: true });
+            });
+        });
 
-        // Settings
-        [el.settingsBtn, el.mobileSettingsBtn, el.openSettingsBtn].forEach(b => b?.addEventListener('click', openSettingsModal));
-        el.configureApiLink?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
-        el.closeSettingsModal?.addEventListener('click', closeSettingsModal);
-        el.saveSettingsBtn?.addEventListener('click', saveSettings);
-        el.settingsModal?.addEventListener('click', (e) => { if (e.target === el.settingsModal) closeSettingsModal(); });
-        el.engineSelect?.addEventListener('change', updateSettingsVisibility);
-
-        // Navigation / CTAs
-        el.mobileMenuBtn?.addEventListener('click', () => el.mobileMenu?.classList.toggle('active'));
-        el.mobileMenu?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => el.mobileMenu.classList.remove('active')));
-        [el.tryFreeBtn, el.signupBtn].forEach(b => b?.addEventListener('click', () => {
-            document.querySelector('.generator-section')?.scrollIntoView({ behavior: 'smooth' });
-            setTimeout(() => el.prompt?.focus(), 500);
-        }));
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeSettingsModal();
-                el.mobileMenu?.classList.remove('active');
+        el.maker.addEventListener('change', function (e) {
+            if (e.target.name === 'aspect') {
+                el.viewfinder.setAttribute('data-aspect', e.target.value);
             }
+            if (e.target.name === 'resolution') enforceVeoRules();
+            updateMeta();
+        });
+
+        el.startImage.addEventListener('change', onImageSelected);
+        el.attachRemove.addEventListener('click', clearImage);
+
+        el.cancelBtn.addEventListener('click', function () { if (state.abort) state.abort.abort(); });
+        el.retryBtn.addEventListener('click', generate);
+        el.downloadBtn.addEventListener('click', download);
+        el.shareBtn.addEventListener('click', share);
+
+        // Settings dialog
+        el.settingsBtn.addEventListener('click', openSettings);
+        el.settings.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', closeSettings); });
+        el.saveSettingsBtn.addEventListener('click', saveSettings);
+        el.settings.querySelectorAll('input[name="engine"]').forEach(function (r) {
+            r.addEventListener('change', updateSettingsFields);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (el.settings.hidden) return;
+            if (e.key === 'Escape') closeSettings();
+            if (e.key === 'Tab') trapFocus(e);
+        });
+
+        el.demoModeFooter.addEventListener('change', function () {
+            settings.demo = el.demoModeFooter.checked;
+            persist();
+            applyEngineUI();
+            toast(settings.demo ? 'Demo mode on: sample clips, no engine calls.' : 'Demo mode off.', 'info');
         });
     }
 
-    // ==================== GENERATION ====================
-    async function handleGenerate() {
-        if (state.isGenerating) {
-            // Second click while running = cancel
-            state.abort?.abort();
-            return;
-        }
+    // ==================== FORM ====================
+    function isVeo() { return settings.engine !== 'free'; }
 
-        const prompt = el.prompt.value.trim();
-        if (prompt.length < 3) {
-            notify('Please enter a video description (at least 3 characters).', 'error');
-            el.prompt.focus();
-            return;
-        }
-
-        if (!state.demoMode && isVeo() && !API_CONFIG.API_KEY) {
-            notify('Google Veo needs a Gemini API key. Add it in Settings or switch to the free engine.', 'error');
-            openSettingsModal();
-            return;
-        }
-
-        const form = getFormData();
-        state.abort = new AbortController();
-        setGenerating(true);
-        showProgressUI();
-
-        try {
-            let result;
-            if (state.demoMode) {
-                result = await runDemo(form, state.abort.signal);
-            } else if (isVeo()) {
-                result = await generateWithVeo(form, state.abort.signal);
-            } else {
-                result = await generateWithHF(form, state.abort.signal);
-            }
-            showSuccessUI(form, result);
-            notify('Video generated successfully!', 'success');
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                showErrorUI('Generation cancelled. (If Veo already started, it may still be billed.)', false);
-                notify('Generation cancelled.', 'info');
-            } else {
-                console.error('Generation error:', err);
-                showErrorUI(err.message, true);
-                notify(err.message, 'error');
-            }
-        } finally {
-            setGenerating(false);
-            stopTimers();
-        }
+    function radioValue(name) {
+        var r = el.maker.querySelector('input[name="' + name + '"]:checked');
+        return r ? r.value : null;
     }
 
-    function getFormData() {
-        const style = el.style?.value || 'realistic';
-        const userPrompt = el.prompt.value.trim();
+    function renderLengths() {
+        var list = isVeo() ? DURATIONS.veo : DURATIONS.free;
+        var prev = radioValue('length');
+        var pick = list.indexOf(prev) >= 0 ? prev : (isVeo() ? '8' : '3');
+        el.lengthGroup.innerHTML = list.map(function (v) {
+            return '<label><input type="radio" name="length" value="' + v + '"' + (v === pick ? ' checked' : '') + '><span>' + v + 's</span></label>';
+        }).join('');
+    }
+
+    function enforceVeoRules() {
+        if (!isVeo()) return;
+        var lite = settings.engine.indexOf('lite') >= 0;
+        var fourK = el.resolutionGroup.querySelector('input[value="4k"]');
+        fourK.disabled = lite;
+        if (lite && fourK.checked) el.resolutionGroup.querySelector('input[value="1080p"]').checked = true;
+        var needs8 = radioValue('resolution') !== '720p';
+        el.lengthGroup.querySelectorAll('input').forEach(function (i) {
+            i.disabled = needs8 && i.value !== '8';
+            if (needs8 && i.value === '8') i.checked = true;
+        });
+    }
+
+    function applyEngineUI() {
+        renderLengths();
+        el.resolutionField.hidden = !isVeo();
+        enforceVeoRules();
+        var info = ENGINES[settings.engine] || ENGINES.free;
+        el.engineBadge.textContent = settings.demo ? 'Demo mode' : info.label;
+        el.settingsBtn.classList.toggle('is-paid', isVeo() && !settings.demo);
+        el.settingsBtn.classList.toggle('is-demo', settings.demo);
+        el.generateHint.textContent = settings.demo
+            ? 'Demo mode is on: you will see a sample clip. Turn it off in Settings.'
+            : isVeo()
+                ? 'Google Veo: 1–6 minutes, billed to your Gemini API key. Ctrl + Enter also works.'
+                : 'Free engine: LTX-Video on Hugging Face, usually under a minute. Ctrl + Enter also works.';
+        el.demoModeFooter.checked = settings.demo;
+        updateMeta();
+    }
+
+    function updateMeta() {
+        var parts = [radioValue('aspect') || '16:9', (radioValue('length') || '3') + 's'];
+        if (isVeo()) parts.push(radioValue('resolution') || '720p');
+        el.vfMeta.textContent = parts.join('  ');
+    }
+
+    function updateCharCount() {
+        var n = el.prompt.value.length;
+        el.charCount.textContent = n + ' / 500';
+        el.charCount.classList.toggle('is-good', n >= 60);
+    }
+
+    function getForm() {
+        var style = el.style.value;
+        var userPrompt = el.prompt.value.trim();
         return {
-            userPrompt,
-            prompt: `${userPrompt}\n\nStyle: ${STYLE_HINTS[style] || ''}`.trim(),
-            style,
-            duration: el.length?.value || '8',
-            aspectRatio: el.aspect?.value || '16:9',
-            resolution: el.resolution?.value || '720p',
-            model: API_CONFIG.ENGINE,
+            userPrompt: userPrompt,
+            prompt: userPrompt + '\n\nStyle: ' + (STYLE_HINTS[style] || ''),
+            styleLabel: el.style.options[el.style.selectedIndex].text,
+            duration: radioValue('length') || '3',
+            aspect: radioValue('aspect') || '16:9',
+            resolution: radioValue('resolution') || '720p',
+            engine: settings.engine,
             image: state.startImage
         };
     }
 
-    function isVeo() {
-        return API_CONFIG.ENGINE !== 'free';
-    }
-
-    // Rebuild the length options and show/hide Veo-only controls for the current engine
-    function applyEngineUI() {
-        if (el.length) {
-            const prev = el.length.value;
-            const list = isVeo() ? DURATIONS.veo : DURATIONS.free;
-            el.length.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
-            el.length.value = list.some(([v]) => v === prev) ? prev : (isVeo() ? '8' : '3');
+    // ==================== GENERATE ====================
+    function generate() {
+        if (state.busy) return;
+        var prompt = el.prompt.value.trim();
+        if (prompt.length < 3) {
+            toast('Describe your video first: what happens, where, and how the camera moves.', 'error');
+            el.prompt.focus();
+            return;
         }
-        if (el.resolutionGroup) el.resolutionGroup.style.display = isVeo() ? '' : 'none';
-        if (el.generateBtn && !state.isGenerating) setGenerating(false);
-        enforceResolutionRules();
-    }
-
-    function updateSettingsVisibility() {
-        const veo = (el.engineSelect?.value || 'free') !== 'free';
-        if (el.veoSettings) el.veoSettings.style.display = veo ? '' : 'none';
-    }
-
-    // Veo rules: 1080p and 4K require 8s; Lite has no 4K.
-    function enforceResolutionRules() {
-        if (!el.resolution || !el.length || !isVeo()) return;
-        const isLite = API_CONFIG.ENGINE.includes('lite');
-        const fourK = el.resolution.querySelector('option[value="4k"]');
-        if (fourK) {
-            fourK.disabled = isLite;
-            if (isLite && el.resolution.value === '4k') el.resolution.value = '1080p';
+        if (!settings.demo && isVeo() && !settings.apiKey) {
+            toast('Google Veo needs a Gemini API key. Add it in Settings, or switch to the free engine.', 'error');
+            openSettings();
+            return;
         }
-        const needs8 = el.resolution.value !== '720p';
-        [...el.length.options].forEach(o => { o.disabled = needs8 && o.value !== '8'; });
-        if (needs8) el.length.value = '8';
-    }
 
-    async function veoFetch(url, options = {}) {
-        const res = await fetch(url, {
-            ...options,
-            headers: {
-                'x-goog-api-key': API_CONFIG.API_KEY,
-                ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-                ...(options.headers || {})
+        var form = getForm();
+        state.abort = new AbortController();
+        setBusy(true);
+        startWorking();
+        // On small screens the viewfinder sits below the form, so bring it into view
+        if (window.matchMedia && window.matchMedia('(max-width: 960px)').matches) {
+            el.viewfinder.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        var job = settings.demo ? runDemo(form, state.abort.signal)
+            : isVeo() ? generateWithVeo(form, state.abort.signal)
+                : generateWithHF(form, state.abort.signal);
+
+        job.then(function (result) {
+            showResult(form, result);
+            if (document.hidden) document.title = 'Video ready - Stark';
+        }).catch(function (err) {
+            if (err && err.name === 'AbortError') {
+                setView('empty');
+                toast('Cancelled.', 'info');
+            } else {
+                console.error(err);
+                showError((err && err.message) || 'Something went wrong. Try again.');
             }
+        }).then(function () {
+            setBusy(false);
+            stopTimers();
         });
-        let data = null;
-        try { data = await res.json(); } catch { /* non-JSON */ }
-        if (!res.ok) throw new Error(friendlyApiError(res.status, data));
-        return data;
     }
 
-    function friendlyApiError(status, data) {
-        const msg = data?.error?.message || `HTTP ${status}`;
-        if (status === 400 && /API key not valid/i.test(msg)) return 'Invalid Gemini API key. Check it in Settings.';
-        if (status === 403) return `Permission denied: ${msg}. Make sure the Generative Language API is enabled for your key.`;
-        if (status === 404) return `Model not found: ${msg}. Try a different Veo model in Settings.`;
-        if (status === 429) return `Quota or rate limit reached: ${msg}. Veo needs billing enabled on your Gemini API project.`;
-        return msg;
+    function setBusy(on) {
+        state.busy = on;
+        el.generateBtn.disabled = on;
+        el.generateLabel.textContent = on ? 'Making your video…' : 'Make video';
     }
 
-    async function generateWithVeo(form, signal) {
-        // 1) Start the long-running operation
-        setStep(0, 5);
-        const instance = { prompt: form.prompt };
-        if (form.image) {
-            instance.image = { inlineData: { mimeType: form.image.mimeType, data: form.image.data } };
-        }
-        const body = {
-            instances: [instance],
-            parameters: {
-                aspectRatio: form.aspectRatio,
-                resolution: form.resolution,
-                durationSeconds: Number(form.duration)
-            }
-        };
+    // ---------- Free engine: LTX-Video on Hugging Face ----------
+    function generateWithHF(form, signal) {
+        setStatus('Connecting to the free server…', 'Hugging Face may need a moment to wake up.', 3);
+        var useImage = !!form.image;
 
-        const op = await veoFetch(`${API_CONFIG.BASE_URL}/models/${form.model}:predictLongRunning`, {
-            method: 'POST',
-            body: JSON.stringify(body),
-            signal
+        return import(CONFIG.GRADIO_CLIENT_URL).then(function (mod) {
+            return mod.Client.connect(CONFIG.HF_SPACE, settings.hfToken ? { token: settings.hfToken } : {})
+                .catch(function (e) {
+                    throw new Error('Couldn\'t reach the free video server (' + ((e && e.message) || e) + '). It may be busy; try again in a minute.');
+                })
+                .then(function (client) {
+                    if (signal.aborted) throw abortError();
+                    var size = FREE_SIZES[form.aspect] || FREE_SIZES['16:9'];
+                    var payload = [
+                        form.prompt,
+                        'worst quality, inconsistent motion, blurry, jittery, distorted',
+                        useImage ? mod.handle_file(dataUrlToBlob(form.image.dataUrl)) : null,
+                        null,
+                        size[1],                                  // height
+                        size[0],                                  // width
+                        useImage ? 'image-to-video' : 'text-to-video',
+                        Number(form.duration),
+                        9, 42, true, 1, true                      // frames, seed, randomize, guidance, improve texture
+                    ];
+                    return runGradioJob(client.submit(useImage ? '/image_to_video' : '/text_to_video', payload), signal);
+                });
+        }).then(function (data) {
+            var url = extractVideoUrl(data && data[0]);
+            if (!url) throw new Error('The free server finished but sent no video. Try again.');
+            stopProgress();
+            setStatus('Downloading your video…', '', 94);
+            return fetch(url, { signal: signal })
+                .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
+                .then(function (blob) { return { blob: blob, url: URL.createObjectURL(blob) }; })
+                .catch(function (e) {
+                    if (e && e.name === 'AbortError') throw e;
+                    return { blob: null, url: url };     // stream directly from Hugging Face
+                });
         });
-        if (!op?.name) throw new Error('Unexpected response from Gemini API (no operation name).');
-        console.log('Veo operation started:', op.name);
-
-        // 2) Poll until done
-        setStep(1, 10);
-        startFakeProgress(10, 85, 150000); // creep toward 85% over ~2.5 min
-        let operation = op;
-        while (!operation.done) {
-            if (Date.now() - state.startTime > API_CONFIG.MAX_WAIT_MS) {
-                throw new Error('Veo is taking unusually long. Please try again later.');
-            }
-            await sleep(API_CONFIG.POLL_INTERVAL, signal);
-            operation = await veoFetch(`${API_CONFIG.BASE_URL}/${op.name}`, { signal });
-        }
-
-        if (operation.error) {
-            throw new Error(`Veo error: ${operation.error.message || 'generation failed'}`);
-        }
-
-        const resp = operation.response?.generateVideoResponse;
-        const sample = resp?.generatedSamples?.[0];
-        const uri = sample?.video?.uri;
-        if (!uri) {
-            const reasons = resp?.raiMediaFilteredReasons;
-            if (reasons?.length) throw new Error(`Blocked by Google's safety filters: ${reasons.join(' ')} Try rewording your prompt.`);
-            throw new Error('Veo finished but returned no video. Try rewording your prompt.');
-        }
-
-        // 3) Download the MP4 (needs the API key)
-        stopFakeProgress();
-        setStep(2, 90);
-        const blob = await downloadVeoVideo(uri, signal);
-        setStep(3, 100);
-        return { blob, url: URL.createObjectURL(blob), remoteUri: uri };
     }
 
-    // ==================== FREE ENGINE: LTX-Video on Hugging Face ====================
-    async function generateWithHF(form, signal) {
-        setStep(0, 3);
-        setNote('Connecting to the free AI server on Hugging Face…');
-        const { Client, handle_file } = await import(API_CONFIG.GRADIO_CLIENT_URL);
-
-        let client;
-        try {
-            client = await Client.connect(API_CONFIG.HF_SPACE, API_CONFIG.HF_TOKEN ? { token: API_CONFIG.HF_TOKEN } : {});
-        } catch (err) {
-            throw new Error(`Could not reach the free video server (${err.message || err}). It may be sleeping or busy; try again in a minute.`);
-        }
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        const [width, height] = FREE_SIZES[form.aspectRatio] || FREE_SIZES['16:9'];
-        const useImage = !!form.image;
-        const imageArg = useImage ? handle_file(dataUrlToBlob(form.image.dataUrl)) : null;
-
-        // Order matches generate() in the Space's app.py
-        const payload = [
-            form.prompt,                                            // prompt
-            'worst quality, inconsistent motion, blurry, jittery, distorted', // negative prompt
-            imageArg,                                               // input image
-            null,                                                   // input video
-            height,                                                 // height
-            width,                                                  // width
-            useImage ? 'image-to-video' : 'text-to-video',          // mode
-            Number(form.duration),                                  // duration (seconds)
-            9,                                                      // frames to use (video-to-video only)
-            42,                                                     // seed
-            true,                                                   // randomize seed
-            1,                                                      // guidance scale
-            true                                                    // improve texture
-        ];
-
-        const job = client.submit(useImage ? '/image_to_video' : '/text_to_video', payload);
-        const onAbort = () => { try { job.cancel(); } catch { /* ignore */ } };
+    function runGradioJob(job, signal) {
+        var iterator = job[Symbol.asyncIterator]();
+        var onAbort = function () { try { job.cancel(); } catch (e) { /* ignore */ } };
         signal.addEventListener('abort', onAbort, { once: true });
 
-        let output = null;
-        try {
-            for await (const msg of job) {
-                if (signal.aborted) break;
+        function step() {
+            if (signal.aborted) return Promise.reject(abortError());
+            return iterator.next().then(function (res) {
+                if (res.done) return null;
+                var msg = res.value;
+                if (msg.type === 'data') return msg.data;
                 if (msg.type === 'status') {
-                    if (msg.stage === 'error') {
-                        throw new Error(friendlyHFError(msg.message));
-                    }
+                    if (msg.stage === 'error') throw new Error(friendlyHFError(msg.message));
                     if (msg.stage === 'pending' && msg.queue && msg.position != null) {
-                        setStep(0, 8);
-                        setNote(`Waiting in the free queue: position ${msg.position + 1}${msg.eta ? `, about ${Math.ceil(msg.eta)}s` : ''}…`);
+                        setStatus('Waiting in line: you\'re number ' + (msg.position + 1),
+                            msg.eta ? 'About ' + Math.ceil(msg.eta) + ' seconds to go.' : 'The free server is shared by everyone.', 8);
                     } else if (msg.stage === 'generating' || (msg.stage === 'pending' && !msg.queue)) {
                         if (!state.progressTimer) {
-                            setStep(1, 15);
-                            setNote('Generating your video on a free GPU. This usually takes 20–90 seconds.');
-                            startFakeProgress(15, 88, 60000);
+                            setStatus('Filming your scene…', 'This usually takes 20–90 seconds.', 15);
+                            creepProgress(15, 88, 60000);
                         }
                     }
-                } else if (msg.type === 'data') {
-                    output = msg.data;
-                    break;
                 }
-            }
-        } finally {
+                return step();
+            });
+        }
+        return step().then(function (data) {
             signal.removeEventListener('abort', onAbort);
-        }
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        const videoUrl = extractVideoUrl(output?.[0]);
-        if (!videoUrl) throw new Error('The free server finished but returned no video. Please try again.');
-
-        stopFakeProgress();
-        setStep(2, 92);
-        setNote('Downloading your video…');
-        try {
-            const res = await fetch(videoUrl, { signal });
-            if (!res.ok) throw new Error(String(res.status));
-            const blob = await res.blob();
-            setStep(3, 100);
-            return { blob, url: URL.createObjectURL(blob), remoteUri: videoUrl };
-        } catch (err) {
-            if (err.name === 'AbortError') throw err;
-            // Fall back to streaming straight from Hugging Face
-            setStep(3, 100);
-            return { blob: null, url: videoUrl, remoteUri: videoUrl };
-        }
+            if (signal.aborted) throw abortError();
+            return data;
+        }, function (err) {
+            signal.removeEventListener('abort', onAbort);
+            throw err;
+        });
     }
 
     function extractVideoUrl(v) {
         if (!v) return null;
         if (typeof v === 'string') return v;
         if (v.video) return extractVideoUrl(v.video);
-        return v.url || (v.path ? `https://${API_CONFIG.HF_SPACE.replace('/', '-').replace(/\./g, '-').toLowerCase()}.hf.space/gradio_api/file=${v.path}` : null);
+        if (v.url) return v.url;
+        if (v.path) return 'https://' + CONFIG.HF_SPACE.replace('/', '-').replace(/\./g, '-').toLowerCase() + '.hf.space/gradio_api/file=' + v.path;
+        return null;
     }
 
     function friendlyHFError(message) {
-        const m = String(message || '');
+        var m = String(message || '');
         if (/quota|exceeded|ZeroGPU|GPU.*limit/i.test(m)) {
-            return 'You have used up the free GPU time for now. Wait a while, or add a free Hugging Face token in Settings for more free usage.';
+            return 'You\'ve used your free GPU time for now. Wait a while, or add a free Hugging Face token in Settings for more.';
         }
-        return m ? `Free server error: ${m}` : 'The free video server returned an error. Please try again.';
+        return m ? 'The free server reported: ' + m : 'The free server returned an error. Try again.';
     }
 
-    function dataUrlToBlob(dataUrl) {
-        const [head, b64] = dataUrl.split(',');
-        const mime = head.match(/:(.*?);/)[1];
-        const bin = atob(b64);
-        const arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        return new Blob([arr], { type: mime });
+    // ---------- Google Veo ----------
+    function veoFetch(url, options) {
+        options = options || {};
+        var headers = { 'x-goog-api-key': settings.apiKey };
+        if (options.body) headers['Content-Type'] = 'application/json';
+        return fetch(url, { method: options.method || 'GET', body: options.body, headers: headers, signal: options.signal })
+            .then(function (res) {
+                return res.json().catch(function () { return null; }).then(function (data) {
+                    if (!res.ok) throw new Error(friendlyVeoError(res.status, data));
+                    return data;
+                });
+            });
     }
 
-    function setNote(text) {
-        if (el.progressNote) el.progressNote.textContent = text;
+    function friendlyVeoError(status, data) {
+        var msg = (data && data.error && data.error.message) || ('HTTP ' + status);
+        if (status === 400 && /API key not valid/i.test(msg)) return 'That Gemini API key isn\'t valid. Check it in Settings.';
+        if (status === 403) return 'Permission denied: ' + msg;
+        if (status === 404) return 'Google didn\'t find that Veo model. Pick another engine in Settings.';
+        if (status === 429) return 'Your Gemini key has no Veo quota. Turn on billing for its Google Cloud project, or switch to the free engine.';
+        return msg;
     }
 
-    async function downloadVeoVideo(uri, signal) {
-        // Pass the key as a query param so the request stays "simple" (no CORS preflight)
-        const keyed = uri + (uri.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(API_CONFIG.API_KEY);
-        const res = await fetch(keyed, { signal });
-        if (!res.ok) throw new Error(`Could not download the video (HTTP ${res.status}).`);
-        return res.blob();
-    }
+    function generateWithVeo(form, signal) {
+        setStatus('Sending your prompt to Google Veo…', '', 5);
+        var instance = { prompt: form.prompt };
+        if (form.image) instance.image = { inlineData: { mimeType: form.image.mimeType, data: form.image.data } };
+        var body = {
+            instances: [instance],
+            parameters: { aspectRatio: form.aspect, resolution: form.resolution, durationSeconds: Number(form.duration) }
+        };
 
-    async function runDemo(form, signal) {
-        setStep(0, 5);
-        await sleep(800, signal);
-        setStep(1, 10);
-        startFakeProgress(10, 90, 4000);
-        await sleep(4500, signal);
-        setStep(3, 100);
-        const url = DEMO_VIDEOS[Math.floor(Math.random() * DEMO_VIDEOS.length)];
-        return { blob: null, url, remoteUri: url };
-    }
+        return veoFetch(CONFIG.GEMINI_BASE + '/models/' + form.engine + ':predictLongRunning', {
+            method: 'POST', body: JSON.stringify(body), signal: signal
+        }).then(function (op) {
+            if (!op || !op.name) throw new Error('Google sent an unexpected response.');
+            setStatus('Veo is filming your scene…', 'This usually takes 1–6 minutes.', 10);
+            creepProgress(10, 85, 150000);
 
-    // ==================== PROGRESS UI ====================
-    function setStep(index, percent) {
-        document.querySelectorAll('.progress-steps .step').forEach((s, i) => {
-            s.classList.toggle('active', i === index);
-            s.classList.toggle('done', i < index);
+            function poll() {
+                if (Date.now() - state.startTime > CONFIG.MAX_WAIT_MS) throw new Error('Veo is taking unusually long. Try again later.');
+                return sleep(CONFIG.VEO_POLL_MS, signal)
+                    .then(function () { return veoFetch(CONFIG.GEMINI_BASE + '/' + op.name, { signal: signal }); })
+                    .then(function (o) { return o.done ? o : poll(); });
+            }
+            return poll();
+        }).then(function (operation) {
+            if (operation.error) throw new Error('Veo couldn\'t make the video: ' + (operation.error.message || 'unknown error'));
+            var resp = operation.response && operation.response.generateVideoResponse;
+            var sample = resp && resp.generatedSamples && resp.generatedSamples[0];
+            var uri = sample && sample.video && sample.video.uri;
+            if (!uri) {
+                var reasons = resp && resp.raiMediaFilteredReasons;
+                if (reasons && reasons.length) throw new Error('Google\'s safety filter blocked this video: ' + reasons.join(' ') + ' Try rewording the prompt.');
+                throw new Error('Veo finished but sent no video. Try rewording the prompt.');
+            }
+            stopProgress();
+            setStatus('Downloading your video…', '', 92);
+            var keyed = uri + (uri.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(settings.apiKey);
+            return fetch(keyed, { signal: signal }).then(function (r) {
+                if (!r.ok) throw new Error('Couldn\'t download the video (HTTP ' + r.status + ').');
+                return r.blob();
+            }).then(function (blob) { return { blob: blob, url: URL.createObjectURL(blob) }; });
         });
+    }
+
+    // ---------- Demo ----------
+    function runDemo(form, signal) {
+        setStatus('Filming a sample scene…', 'Demo mode: no engine is called.', 10);
+        creepProgress(10, 95, 3000);
+        return sleep(3200, signal).then(function () {
+            return { blob: null, url: DEMO_VIDEOS[Math.floor(Math.random() * DEMO_VIDEOS.length)] };
+        });
+    }
+
+    // ==================== VIEWFINDER ====================
+    function setView(name) {
+        el.viewfinder.setAttribute('data-state', name);
+        el.recLabel.textContent = name === 'working' ? 'REC' : 'STBY';
+        if (name !== 'done') {
+            try { el.video.pause(); } catch (e) { /* ignore */ }
+        }
+    }
+
+    function startWorking() {
+        setView('working');
+        el.outputBar.hidden = true;
+        setProgress(0);
+        state.startTime = Date.now();
+        var tick = function () {
+            var s = Math.floor((Date.now() - state.startTime) / 1000);
+            el.recTime.textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+        };
+        tick();
+        state.clockTimer = setInterval(tick, 1000);
+    }
+
+    function setStatus(title, detail, percent) {
+        el.statusText.textContent = title;
+        el.statusDetail.textContent = detail || '';
         if (percent != null) setProgress(percent);
     }
 
     function setProgress(p) {
-        const v = Math.max(0, Math.min(100, p));
-        if (el.progressFill) el.progressFill.style.width = `${v}%`;
-        if (el.progressPercent) el.progressPercent.textContent = `${Math.round(v)}%`;
+        var v = Math.max(0, Math.min(100, p));
+        el.progressFill.style.width = v + '%';
+        el.progress.setAttribute('aria-valuenow', String(Math.round(v)));
     }
 
-    function startFakeProgress(from, to, durationMs) {
-        stopFakeProgress();
-        const t0 = Date.now();
-        state.progressTimer = setInterval(() => {
-            const t = Math.min(1, (Date.now() - t0) / durationMs);
-            // ease-out so it slows down but never stalls completely
+    function creepProgress(from, to, ms) {
+        stopProgress();
+        var t0 = Date.now();
+        state.progressTimer = setInterval(function () {
+            var t = Math.min(1, (Date.now() - t0) / ms);
             setProgress(from + (to - from) * (1 - Math.pow(1 - t, 2)));
         }, 250);
     }
 
-    function stopFakeProgress() {
-        clearInterval(state.progressTimer);
-        state.progressTimer = null;
+    function stopProgress() { clearInterval(state.progressTimer); state.progressTimer = null; }
+    function stopTimers() { stopProgress(); clearInterval(state.clockTimer); state.clockTimer = null; }
+
+    function showError(message) {
+        el.errorText.textContent = message;
+        setView('error');
+        el.retryBtn.focus({ preventScroll: true });
     }
 
-    function stopTimers() {
-        stopFakeProgress();
-        clearInterval(state.elapsedTimer);
-        state.elapsedTimer = null;
-    }
-
-    function showProgressUI() {
-        if (el.videoResult) el.videoResult.style.display = 'none';
-        if (el.outputPlaceholder) el.outputPlaceholder.style.display = 'none';
-        if (el.progressContainer) el.progressContainer.style.display = 'block';
-        setNote(state.demoMode
-            ? 'Demo Mode: showing a sample video, no AI call is made.'
-            : isVeo()
-                ? 'Veo usually takes 1–6 minutes. Keep this tab open. Click the button again to cancel.'
-                : 'Connecting to the free AI server… Click the button again to cancel.');
-        if (el.progressTitle) {
-            el.progressTitle.textContent = state.demoMode ? 'Demo video' : `Generating with ${MODEL_NAMES[API_CONFIG.ENGINE] || 'AI'}`;
+    function showResult(form, result) {
+        setProgress(100);
+        var engineName = settings.demo ? 'Demo' : (ENGINES[form.engine] || ENGINES.free).name;
+        var meta = form.aspect + ', ' + form.duration + 's, ' + form.styleLabel.toLowerCase() + ', ' + engineName;
+        state.history.unshift({ url: result.url, blob: result.blob, prompt: form.userPrompt, meta: meta, aspect: form.aspect });
+        if (state.history.length > 12) {
+            var old = state.history.pop();
+            if (old.url.indexOf('blob:') === 0) URL.revokeObjectURL(old.url);
         }
-        setStep(0, 0);
-
-        state.startTime = Date.now();
-        const tick = () => {
-            const s = Math.floor((Date.now() - state.startTime) / 1000);
-            if (el.progressElapsed) el.progressElapsed.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-        };
-        tick();
-        state.elapsedTimer = setInterval(tick, 1000);
+        showHistoryItem(0, true);
+        renderHistory();
     }
 
-    function setGenerating(on) {
-        state.isGenerating = on;
-        if (!el.generateBtn) return;
-        el.generateBtn.classList.toggle('is-cancel', on);
-        el.generateBtn.innerHTML = on
-            ? '<i class="fas fa-spinner fa-spin"></i> Generating… (click to cancel)'
-            : `<i class="fas fa-bolt"></i> Generate Video${isVeo() ? ' with Veo' : ' (Free)'}`;
-    }
-
-    function showSuccessUI(form, result) {
-        if (state.currentVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(state.currentVideoUrl);
-        state.currentVideoUrl = result.url;
-        state.currentVideoBlob = result.blob;
-
-        if (el.progressContainer) el.progressContainer.style.display = 'none';
-        if (el.videoResult) el.videoResult.style.display = 'block';
-
-        const v = el.generatedVideo;
-        if (v) {
-            v.src = result.url;
-            v.load();
-            v.play().catch(() => { /* autoplay may be blocked */ });
+    function showHistoryItem(index, autoplay) {
+        var item = state.history[index];
+        if (!item) return;
+        state.current = index;
+        el.viewfinder.setAttribute('data-aspect', item.aspect);
+        el.video.src = item.url;
+        setView('done');
+        el.outputCaption.innerHTML = '';
+        var strong = document.createElement('strong');
+        strong.textContent = truncate(item.prompt, 90);
+        el.outputCaption.appendChild(strong);
+        el.outputCaption.appendChild(document.createTextNode(' ' + item.meta));
+        el.outputBar.hidden = false;
+        if (autoplay) {
+            var p = el.video.play();
+            if (p && p.catch) p.catch(function () { /* autoplay blocked */ });
         }
-
-        setText('video-title', form.userPrompt.length > 70 ? form.userPrompt.slice(0, 70) + '…' : form.userPrompt);
-        setText('video-duration', `${form.duration}s`);
-        setText('video-style-result', el.style?.selectedOptions[0]?.textContent || form.style);
-        setText('video-ratio', isVeo() && !state.demoMode ? `${form.aspectRatio} · ${form.resolution}` : form.aspectRatio);
-        setText('video-model', state.demoMode ? 'Demo' : (MODEL_NAMES[form.model] || form.model));
-
-        if (el.downloadBtn) el.downloadBtn.disabled = false;
-        if (el.shareBtn) el.shareBtn.disabled = false;
+        renderHistory();
     }
 
-    function showErrorUI(message, showRetry) {
-        if (el.progressContainer) el.progressContainer.style.display = 'none';
-        if (!el.outputPlaceholder) return;
-        el.outputPlaceholder.style.display = 'block';
-        el.outputPlaceholder.innerHTML = `
-            <div class="output-error">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h4>${showRetry ? 'Generation Failed' : 'Stopped'}</h4>
-                <p>${escapeHtml(message)}</p>
-                <div class="output-error-actions">
-                    ${showRetry ? '<button class="btn btn-primary btn-sm" id="retry-btn"><i class="fas fa-redo"></i> Try Again</button>' : ''}
-                    <button class="btn btn-outline btn-sm" id="reset-btn"><i class="fas fa-times"></i> Dismiss</button>
-                </div>
-            </div>`;
-        $('retry-btn')?.addEventListener('click', () => { resetPlaceholder(); handleGenerate(); });
-        $('reset-btn')?.addEventListener('click', resetPlaceholder);
+    function renderHistory() {
+        el.historyWrap.hidden = state.history.length < 2;
+        el.history.innerHTML = '';
+        state.history.forEach(function (item, i) {
+            var li = document.createElement('li');
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'history-item' + (i === state.current ? ' is-current' : '');
+            b.setAttribute('aria-label', 'Show video: ' + item.prompt);
+            var v = document.createElement('video');
+            v.src = item.url + (item.url.indexOf('blob:') === 0 ? '' : '#t=0.5');
+            v.muted = true;
+            v.preload = 'metadata';
+            v.setAttribute('playsinline', '');
+            var cap = document.createElement('span');
+            cap.textContent = item.prompt;
+            b.appendChild(v);
+            b.appendChild(cap);
+            b.addEventListener('click', function () { showHistoryItem(i, true); });
+            li.appendChild(b);
+            el.history.appendChild(li);
+        });
     }
 
-    function resetPlaceholder() {
-        if (el.outputPlaceholder) el.outputPlaceholder.innerHTML = PLACEHOLDER_HTML;
-    }
-
-    // ==================== IMAGE-TO-VIDEO ====================
-    function handleImageSelected(e) {
-        const file = e.target.files?.[0];
+    // ==================== PHOTO ====================
+    function onImageSelected(e) {
+        var file = e.target.files && e.target.files[0];
         if (!file) return;
-        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
-            notify('Please choose a PNG, JPEG or WebP image.', 'error');
-            return;
-        }
-        if (file.size > 15 * 1024 * 1024) {
-            notify('Image is too large (max 15 MB).', 'error');
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-            const dataUrl = reader.result;
-            state.startImage = { mimeType: file.type, data: dataUrl.split(',')[1], dataUrl };
-            if (el.imagePreviewImg) el.imagePreviewImg.src = dataUrl;
-            if (el.imagePreview) el.imagePreview.hidden = false;
-            if (el.imageUploadText) el.imageUploadText.textContent = `Starting image: ${file.name}`;
+        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { toast('Choose a PNG, JPEG or WebP photo.', 'error'); return; }
+        if (file.size > 15 * 1024 * 1024) { toast('That photo is over 15 MB. Choose a smaller one.', 'error'); return; }
+        var reader = new FileReader();
+        reader.onload = function () {
+            var dataUrl = String(reader.result);
+            state.startImage = { mimeType: file.type, data: dataUrl.split(',')[1], dataUrl: dataUrl };
+            el.attachImg.src = dataUrl;
+            el.attachPreview.hidden = false;
+            el.attachText.textContent = file.name;
         };
         reader.readAsDataURL(file);
     }
 
-    function clearStartImage() {
+    function clearImage() {
         state.startImage = null;
-        if (el.startImageInput) el.startImageInput.value = '';
-        if (el.imagePreview) el.imagePreview.hidden = true;
-        if (el.imageUploadText) el.imageUploadText.textContent = 'Optional: add a starting image (image-to-video)';
+        el.startImage.value = '';
+        el.attachPreview.hidden = true;
+        el.attachText.textContent = 'Start from a photo (optional)';
     }
 
     // ==================== DOWNLOAD / SHARE ====================
-    function downloadVideo() {
-        if (!state.currentVideoUrl) return notify('No video to download yet.', 'error');
-        const a = document.createElement('a');
-        a.href = state.currentVideoUrl;
-        a.download = `stark-veo-${Date.now()}.mp4`;
-        if (!state.currentVideoBlob) a.target = '_blank';
+    function download() {
+        var item = state.history[state.current];
+        if (!item) return;
+        var a = document.createElement('a');
+        a.href = item.url;
+        a.download = 'stark-video-' + Date.now() + '.mp4';
+        if (!item.blob) { a.target = '_blank'; a.rel = 'noopener'; }
         document.body.appendChild(a);
         a.click();
         a.remove();
-        notify('Download started.', 'info');
     }
 
-    async function shareVideo() {
-        if (!state.currentVideoUrl) return notify('No video to share yet.', 'error');
-        try {
-            if (state.currentVideoBlob && navigator.canShare) {
-                const file = new File([state.currentVideoBlob], 'stark-veo-video.mp4', { type: 'video/mp4' });
-                if (navigator.canShare({ files: [file] })) {
-                    await navigator.share({ files: [file], title: 'AI video made with Stark + Google Veo' });
-                    return;
-                }
-            }
-            if (navigator.clipboard && /^https?:/.test(state.currentVideoUrl)) {
-                await navigator.clipboard.writeText(state.currentVideoUrl);
-                notify('Video link copied to clipboard.', 'success');
+    function share() {
+        var item = state.history[state.current];
+        if (!item) return;
+        if (item.blob && navigator.canShare) {
+            var file = new File([item.blob], 'stark-video.mp4', { type: 'video/mp4' });
+            if (navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file], title: 'AI video made with Stark' }).catch(function () { /* dismissed */ });
                 return;
             }
-            notify('Your browser can\'t share video files directly. Download it and share the file instead.', 'info');
-        } catch (err) {
-            if (err.name !== 'AbortError') notify('Sharing failed.', 'error');
         }
+        if (/^https?:/.test(item.url) && navigator.clipboard) {
+            navigator.clipboard.writeText(item.url).then(function () { toast('Link copied.', 'success'); });
+            return;
+        }
+        toast('This browser can\'t share video files. Download it, then share the file.', 'info');
     }
 
     // ==================== SETTINGS ====================
+    function store(fn) { try { return fn(); } catch (e) { return null; } }
+
     function loadSettings() {
-        try {
-            API_CONFIG.API_KEY = localStorage.getItem('stark_gemini_api_key') || API_CONFIG.API_KEY;
-            API_CONFIG.HF_TOKEN = localStorage.getItem('stark_hf_token') || API_CONFIG.HF_TOKEN;
-            const engine = localStorage.getItem('stark_engine');
-            if (engine && MODEL_NAMES[engine]) API_CONFIG.ENGINE = engine;
-            state.demoMode = localStorage.getItem('stark_demo_mode') === 'true';
-        } catch { /* storage unavailable */ }
-        if (el.apiKeyInput) el.apiKeyInput.value = API_CONFIG.API_KEY;
-        if (el.hfTokenInput) el.hfTokenInput.value = API_CONFIG.HF_TOKEN;
-        if (el.engineSelect) el.engineSelect.value = API_CONFIG.ENGINE;
-        if (el.demoModeCheckbox) el.demoModeCheckbox.checked = state.demoMode;
-        updateSettingsVisibility();
-        updateDemoModeIndicator();
-    }
-
-    function saveSettings() {
-        API_CONFIG.API_KEY = el.apiKeyInput?.value.trim() || '';
-        API_CONFIG.HF_TOKEN = el.hfTokenInput?.value.trim() || '';
-        API_CONFIG.ENGINE = el.engineSelect?.value || 'free';
-        state.demoMode = !!el.demoModeCheckbox?.checked;
-        try {
-            const put = (k, v) => v ? localStorage.setItem(k, v) : localStorage.removeItem(k);
-            put('stark_gemini_api_key', API_CONFIG.API_KEY);
-            put('stark_hf_token', API_CONFIG.HF_TOKEN);
-            localStorage.setItem('stark_engine', API_CONFIG.ENGINE);
-            localStorage.setItem('stark_demo_mode', String(state.demoMode));
-        } catch { /* storage unavailable */ }
-        if (isVeo() && !API_CONFIG.API_KEY && !state.demoMode) {
-            notify('Google Veo needs a Gemini API key with billing enabled.', 'warning');
-        } else {
-            notify('Settings saved.', 'success');
-        }
-        updateDemoModeIndicator();
-        checkApiKeyStatus();
-        applyEngineUI();
-        closeSettingsModal();
-    }
-
-    function checkApiKeyStatus() {
-        const missing = isVeo() && !API_CONFIG.API_KEY && !state.demoMode;
-        if (el.apiNotice) el.apiNotice.style.display = 'none';
-        el.setupGuide?.classList.toggle('active', missing);
-    }
-
-    function updateDemoModeIndicator() {
-        if (el.demoModeIndicator) el.demoModeIndicator.style.display = state.demoMode ? 'flex' : 'none';
-    }
-
-    function openSettingsModal() {
-        if (el.settingsModal) el.settingsModal.style.display = 'flex';
-        setTimeout(() => el.apiKeyInput?.focus(), 50);
-    }
-
-    function closeSettingsModal() {
-        if (el.settingsModal) el.settingsModal.style.display = 'none';
-    }
-
-    // ==================== HELPERS ====================
-    function updateCharCounter() {
-        if (!el.charCount || !el.prompt) return;
-        const n = el.prompt.value.length;
-        el.charCount.textContent = `${n}/500`;
-        el.charCount.style.color = n < 50 ? '#ff6b6b' : n < 150 ? '#ffa726' : '#4CAF50';
-    }
-
-    function startClock() {
-        if (!el.currentTime) return;
-        const tick = () => {
-            el.currentTime.innerHTML = `<i class="fas fa-clock"></i> ${new Date().toLocaleTimeString()}`;
-        };
-        tick();
-        setInterval(tick, 1000);
-    }
-
-    function setText(id, text) {
-        const node = $(id);
-        if (node) node.textContent = text;
-    }
-
-    function escapeHtml(str) {
-        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
-
-    function sleep(ms, signal) {
-        return new Promise((resolve, reject) => {
-            if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
-            const t = setTimeout(resolve, ms);
-            signal?.addEventListener('abort', () => {
-                clearTimeout(t);
-                reject(new DOMException('Aborted', 'AbortError'));
-            }, { once: true });
+        store(function () {
+            var engine = localStorage.getItem('stark_engine');
+            if (engine && ENGINES[engine]) settings.engine = engine;
+            settings.hfToken = localStorage.getItem('stark_hf_token') || '';
+            settings.apiKey = localStorage.getItem('stark_gemini_api_key') || '';
+            settings.demo = localStorage.getItem('stark_demo_mode') === 'true';
         });
     }
 
-    function notify(message, type = 'info') {
-        document.querySelector('.stark-notification')?.remove();
-        const n = document.createElement('div');
-        n.className = `stark-notification stark-notification-${type}`;
-        const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
-        n.innerHTML = `<i class="fas fa-${icon}"></i><span></span><button class="notification-close" aria-label="Close">&times;</button>`;
-        n.querySelector('span').textContent = message;
-        n.querySelector('.notification-close').addEventListener('click', () => n.remove());
-        document.body.appendChild(n);
-        setTimeout(() => n.remove(), type === 'error' ? 8000 : 5000);
+    function persist() {
+        store(function () {
+            localStorage.setItem('stark_engine', settings.engine);
+            localStorage.setItem('stark_demo_mode', String(settings.demo));
+            settings.hfToken ? localStorage.setItem('stark_hf_token', settings.hfToken) : localStorage.removeItem('stark_hf_token');
+            settings.apiKey ? localStorage.setItem('stark_gemini_api_key', settings.apiKey) : localStorage.removeItem('stark_gemini_api_key');
+        });
     }
 
-    init();
-});
+    function openSettings() {
+        state.lastFocus = document.activeElement;
+        var radio = el.settings.querySelector('input[name="engine"][value="' + settings.engine + '"]');
+        if (radio) radio.checked = true;
+        el.hfToken.value = settings.hfToken;
+        el.apiKey.value = settings.apiKey;
+        el.demoMode.checked = settings.demo;
+        updateSettingsFields();
+        el.settings.hidden = false;
+        document.body.classList.add('modal-open');
+        var checked = el.settings.querySelector('input[name="engine"]:checked');
+        if (checked) checked.focus();
+    }
+
+    function closeSettings() {
+        el.settings.hidden = true;
+        document.body.classList.remove('modal-open');
+        if (state.lastFocus && state.lastFocus.focus) state.lastFocus.focus();
+    }
+
+    function updateSettingsFields() {
+        var r = el.settings.querySelector('input[name="engine"]:checked');
+        var veo = r && r.value !== 'free';
+        el.veoFields.hidden = !veo;
+        el.hfFields.hidden = !!veo;
+    }
+
+    function saveSettings() {
+        var r = el.settings.querySelector('input[name="engine"]:checked');
+        settings.engine = r ? r.value : 'free';
+        settings.hfToken = el.hfToken.value.trim();
+        settings.apiKey = el.apiKey.value.trim();
+        settings.demo = el.demoMode.checked;
+        persist();
+        applyEngineUI();
+        closeSettings();
+        if (isVeo() && !settings.apiKey && !settings.demo) {
+            toast('Saved. Google Veo still needs a Gemini API key before it can make videos.', 'info');
+        } else {
+            toast('Settings saved.', 'success');
+        }
+    }
+
+    function trapFocus(e) {
+        var nodes = Array.prototype.filter.call(
+            el.settings.querySelectorAll('button, input, a[href], select, textarea'),
+            function (n) { return !n.disabled && n.offsetParent !== null; }
+        );
+        if (!nodes.length) return;
+        var first = nodes[0], last = nodes[nodes.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    // ==================== HELPERS ====================
+    function toast(message, type) {
+        var t = document.createElement('div');
+        t.className = 'toast ' + (type || 'info');
+        t.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        var p = document.createElement('p');
+        p.textContent = message;
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.setAttribute('aria-label', 'Dismiss');
+        x.innerHTML = '&times;';
+        x.addEventListener('click', function () { t.remove(); });
+        t.appendChild(p);
+        t.appendChild(x);
+        while (el.toasts.children.length >= 2) el.toasts.firstChild.remove();
+        el.toasts.appendChild(t);
+        setTimeout(function () { t.remove(); }, type === 'error' ? 8000 : 4500);
+    }
+
+    function sleep(ms, signal) {
+        return new Promise(function (resolve, reject) {
+            if (signal && signal.aborted) return reject(abortError());
+            var t = setTimeout(resolve, ms);
+            if (signal) signal.addEventListener('abort', function () { clearTimeout(t); reject(abortError()); }, { once: true });
+        });
+    }
+
+    function abortError() {
+        try { return new DOMException('Aborted', 'AbortError'); }
+        catch (e) { var err = new Error('Aborted'); err.name = 'AbortError'; return err; }
+    }
+
+    function dataUrlToBlob(dataUrl) {
+        var parts = dataUrl.split(',');
+        var mime = parts[0].match(/:(.*?);/)[1];
+        var bin = atob(parts[1]);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new Blob([arr], { type: mime });
+    }
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) document.title = 'Stark Video AI - Free text-to-video';
+    });
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
