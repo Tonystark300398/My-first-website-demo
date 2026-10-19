@@ -1,132 +1,64 @@
-# Stark Video AI - API Setup Guide
+# Stark Video AI: Gemini API (Veo) Setup Guide
 
-## Getting Started with AI Video Generation
+This website generates AI videos with **Google Veo 3.1** through the **Gemini API**.
 
-This website now integrates with **ThankYou AI's Kling API** to generate real AI videos from text prompts.
+## 1. Get a Gemini API key
 
-### Step 1: Get Your Free API Key
+1. Go to [Google AI Studio → API keys](https://aistudio.google.com/apikey).
+2. Click **Create API key** and copy it (it starts with `AIza...`).
+3. **Turn on billing** for the key's Google Cloud project. Veo is a paid model; with a free-tier key, requests fail with a quota (429) error.
 
-1. Visit [thankyouai.com](https://thankyouai.com)
-2. Sign up for a free account
-3. Navigate to the Developer Dashboard
-4. Generate your API key
-5. Copy the API key
+## 2. Add the key to the website
 
-### Step 2: Configure the Website
+1. Open `index.html` in your browser (double-click it or use VS Code Live Server).
+2. Click **Settings** in the top bar.
+3. Paste your key, choose a model and click **Save Settings**.
 
-**Option A: Via Settings UI (Recommended)**
-1. Open the website in your browser
-2. Click the "Settings" button in the top navigation
-3. Paste your API key in the settings modal
-4. Select your preferred model (Kling v3 Standard is recommended for free tier)
-5. Click "Save Settings"
+The key is stored only in your browser's `localStorage`.
 
-**Option B: Via Code**
-1. Open `script.js`
-2. Find the `API_CONFIG` section at the top
-3. Replace the empty string with your API key:
-```javascript
-const API_CONFIG = {
-    API_KEY: 'your-api-key-here', // Paste your key here
-    // ... other config
-};
-```
+| Model | ID | Notes |
+|---|---|---|
+| Veo 3.1 | `veo-3.1-generate-preview` | Best quality, with audio |
+| Veo 3.1 Fast | `veo-3.1-fast-generate-preview` | Faster and cheaper |
+| Veo 3.1 Lite | `veo-3.1-lite-generate-preview` | Cheapest, no 4K |
 
-**Option C: Demo Mode (No API Key Required)**
-1. Click the "Settings" button
-2. Check the "Demo Mode" checkbox
-3. Click "Save Settings"
-4. Generate videos using placeholder videos (no credits needed!)
+**Demo Mode** (in Settings) plays sample videos without calling the API, so you can test the UI for free.
 
-### Step 3: Generate Your First Video
+## 3. Generate a video
 
-1. Enter a detailed description in the text area
-   - Example: "A panda eating bamboo on a mountain in the early morning with sunlight shining through mist"
-2. Select your preferred video style (Realistic, Anime, Cinematic, etc.)
-3. Choose video length (5-30 seconds)
-4. Select aspect ratio (16:9 for widescreen, 9:16 for vertical)
-5. Click "Generate Video with Stark AI"
-6. Wait for the generation to complete (typically 30-60 seconds)
-7. Your video will appear in the output section!
+1. Describe the video in English for best results (subject, action, setting, camera and sound).
+2. Pick the style, length (4, 6 or 8 s), aspect ratio (16:9 or 9:16) and resolution (720p, 1080p or 4K; 1080p and 4K are 8 s only).
+3. You can add a **starting image** to animate a photo (image-to-video).
+4. Click **Generate Video with Veo**. It usually takes 1–6 minutes. Click the button again to cancel.
+5. Download the MP4. **Google deletes generated videos after 2 days**, so save the ones you want.
 
-### Supported Models
+## How it works (code)
 
-- **Kling v3 Standard** - Best balance of quality and speed (recommended)
-- **Kling v3 Pro** - Higher quality, longer generation time
-- **Kling O1** - Alternative model with different style
+The flow lives in `script.js`, in the `generateWithVeo()` function:
 
-### Pricing
+1. `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:predictLongRunning`
+   with header `x-goog-api-key` and this body:
+   ```json
+   {
+     "instances": [{ "prompt": "...", "image": { "inlineData": { "mimeType": "image/png", "data": "<base64>" } } }],
+     "parameters": { "aspectRatio": "16:9", "resolution": "720p", "durationSeconds": 8 }
+   }
+   ```
+2. Poll `GET /v1beta/{operation.name}` every 10 seconds until `done: true`.
+3. Read `response.generateVideoResponse.generatedSamples[0].video.uri` and download it with your API key.
 
-ThankYou AI offers:
-- **Free tier** with credits to get started
-- **Pay-per-use** based on video duration
-- No credit card required for free tier
+## Troubleshooting
 
-**Credit Costs:**
-- Video generation typically costs 60-90 credits per video
-- Shorter videos (5s) cost fewer credits
-- Standard mode costs less than Pro mode
-- Check the [pricing page](https://thankyouai.com/developer/docs/model-apis/pricing) for details
+| Error | Fix |
+|---|---|
+| "Invalid Gemini API key" | Re-copy the key from AI Studio into Settings. |
+| "Quota or rate limit reached" (429) | Turn on billing for the project, or wait and retry. |
+| "Model not found" (404) | Pick another Veo model in Settings; preview model names change over time. |
+| "Blocked by Google's safety filters" | Reword the prompt. Avoid real people, violence and so on. |
+| Nothing happens | Press F12 and check the Console tab for errors. |
 
-**Adding Credits:**
-1. Go to [thankyouai.com/dashboard](https://thankyouai.com/dashboard)
-2. Navigate to Billing or Credits section
-3. Choose a credit pack or subscription plan
-4. Complete payment
-5. Credits are added instantly
+## ⚠️ Security note
 
-### Features
+The browser calls the Gemini API directly, so this setup is fine for **personal or local use**. Before you publish the site publicly, move the API call to a small backend (for example a Cloudflare Worker, Vercel function or Node server) so visitors can't see or use your key. Never commit your key to Git.
 
-✅ Text-to-video generation
-✅ Multiple aspect ratios (16:9, 9:16, 1:1, 4:5)
-✅ Adjustable video duration (5-30 seconds)
-✅ Multiple video styles
-✅ Audio generation enabled
-✅ Real-time progress tracking
-✅ Download generated videos
-✅ Share videos via link
-✅ **Demo Mode** - Test the UI without API key or credits!
-
-### Troubleshooting
-
-**"API key not configured" error:**
-- Make sure you've saved your API key in the settings
-- Refresh the page after saving settings
-- Or enable Demo Mode to test without an API key
-
-**"Insufficient credits" error:**
-- Add credits at [thankyouai.com/dashboard](https://thankyouai.com/dashboard)
-- Try a shorter video (5 seconds instead of 10+)
-- Enable Demo Mode to test the UI without spending credits
-- Use Standard mode instead of Pro mode
-
-**Generation fails:**
-- Check your API key is valid
-- Ensure you have enough credits in your ThankYou AI account
-- Try a shorter prompt or different settings
-- Check the browser console (F12) for detailed error messages
-
-**Video doesn't play:**
-- Some browsers block autoplay - click the play button manually
-- Check if the video URL is valid in the console (F12)
-- In Demo Mode, videos are placeholders from external sources
-
-### API Reference
-
-For more details on the API, visit:
-- [ThankYou AI Documentation](https://thankyouai.com/developer/docs/kling-compat/text-to-video)
-- [Kling API Reference](https://thankyouai.com/developer/docs)
-
-### Need Help?
-
-- Check the browser console (F12) for error messages
-- Visit ThankYou AI's support documentation
-- Ensure your internet connection is stable
-
----
-
-**Note:** This is a frontend integration. For production use, consider implementing:
-- Backend proxy to hide API keys
-- Rate limiting
-- User authentication
-- Credit management system
+Docs: https://ai.google.dev/gemini-api/docs/veo

@@ -1,935 +1,595 @@
-// Stark Video AI - Main Script (Optimized & Debugged Version)
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Stark Video AI initialized');
-    
-    // ==================== GLOBAL STATE ====================
+// Stark Video AI - Google Gemini API (Veo) video generation
+// Docs: https://ai.google.dev/gemini-api/docs/veo
+document.addEventListener('DOMContentLoaded', () => {
+    'use strict';
+
+    // ==================== CONFIG ====================
+    const API_CONFIG = {
+        BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+        API_KEY: '',                               // Set via Settings (saved in localStorage)
+        MODEL: 'veo-3.1-generate-preview',
+        POLL_INTERVAL: 10000,                      // Google recommends polling every ~10s
+        MAX_WAIT_MS: 12 * 60 * 1000                // Give up after 12 minutes
+    };
+
+    const MODEL_NAMES = {
+        'veo-3.1-generate-preview': 'Veo 3.1',
+        'veo-3.1-fast-generate-preview': 'Veo 3.1 Fast',
+        'veo-3.1-lite-generate-preview': 'Veo 3.1 Lite'
+    };
+
+    const STYLE_HINTS = {
+        realistic: 'Photorealistic, natural lighting, realistic detail.',
+        cinematic: 'Cinematic film look, dramatic lighting, shallow depth of field, smooth camera movement.',
+        anime: 'Japanese anime style, cel-shaded, vibrant colors.',
+        '3d-animation': '3D animated film style, soft global illumination, stylized characters.',
+        artistic: 'Painterly artistic style, expressive brush textures, rich colors.',
+        cartoon: '2D cartoon style, bold outlines, bright playful colors.'
+    };
+
+    const DEMO_VIDEOS = [
+        'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
+    ];
+
+    // ==================== STATE ====================
     const state = {
         isGenerating: false,
-        generationTimer: null,
-        currentJobId: null,
-        currentVideoUrl: null,
-        demoMode: false
+        demoMode: false,
+        abort: null,              // AbortController for the current job
+        progressTimer: null,
+        elapsedTimer: null,
+        startTime: 0,
+        currentVideoUrl: null,    // blob: URL (or remote URL in demo mode)
+        currentVideoBlob: null,
+        startImage: null          // { mimeType, data (base64), dataUrl }
     };
-    
-    // ==================== API CONFIG ====================
-    const API_CONFIG = {
-        BASE_URL: 'https://api.thankyouai.com/open/v1/kling-compat/v1/videos/text2video',
-        STATUS_URL: 'https://api.thankyouai.com/open/v1/kling-compat/v1/videos/text2video',
-        API_KEY: '', // Users should set their API key here
-        TIMEOUT: 30000,
-        POLL_INTERVAL: 3000, // Check status every 3 seconds
-        MAX_POLL_ATTEMPTS: 60 // Maximum 3 minutes (60 * 3s)
+
+    // ==================== DOM ====================
+    const $ = (id) => document.getElementById(id);
+    const el = {
+        prompt: $('video-prompt'),
+        style: $('video-style'),
+        length: $('video-length'),
+        aspect: $('aspect-ratio'),
+        resolution: $('video-resolution'),
+        startImageInput: $('start-image'),
+        imageUploadText: $('image-upload-text'),
+        imagePreview: $('image-preview'),
+        imagePreviewImg: $('image-preview-img'),
+        imageRemove: $('image-remove'),
+        generateBtn: $('generate-btn'),
+        downloadBtn: $('download-btn'),
+        shareBtn: $('share-btn'),
+        settingsBtn: $('settings-btn'),
+        mobileSettingsBtn: $('mobile-settings-btn'),
+        saveSettingsBtn: $('save-settings-btn'),
+        mobileMenuBtn: $('mobile-menu-btn'),
+        mobileMenu: $('mobile-menu'),
+        tryFreeBtn: $('try-free-btn'),
+        signupBtn: $('signup-btn'),
+        settingsModal: $('settings-modal'),
+        closeSettingsModal: $('close-settings-modal'),
+        apiKeyInput: $('api-key'),
+        modelSelect: $('model-select'),
+        demoModeCheckbox: $('demo-mode'),
+        demoModeIndicator: $('demo-mode-indicator'),
+        setupGuide: $('setup-guide'),
+        openSettingsBtn: $('open-settings-btn'),
+        apiNotice: $('api-notice'),
+        configureApiLink: $('configure-api-link'),
+        progressContainer: $('progress-container'),
+        progressFill: $('progress-fill'),
+        progressPercent: $('progress-percent'),
+        progressElapsed: $('progress-elapsed'),
+        progressNote: $('progress-note'),
+        videoResult: $('video-result'),
+        generatedVideo: $('generated-video'),
+        outputPlaceholder: document.querySelector('.output-placeholder'),
+        charCount: $('char-count'),
+        currentTime: $('current-time'),
+        year: $('year')
     };
-    
-    // ==================== DOM ELEMENTS ====================
-    const elements = {
-        // Inputs
-        promptInput: document.getElementById('video-prompt'),
-        styleSelect: document.getElementById('video-style'),
-        lengthSelect: document.getElementById('video-length'),
-        aspectSelect: document.getElementById('aspect-ratio'),
 
-        // Buttons
-        generateBtn: document.getElementById('generate-btn'),
-        downloadBtn: document.getElementById('download-btn'),
-        shareBtn: document.getElementById('share-btn'),
-        settingsBtn: document.getElementById('settings-btn'),
-        mobileSettingsBtn: document.getElementById('mobile-settings-btn'),
-        saveSettingsBtn: document.getElementById('save-settings-btn'),
-        mobileMenuBtn: document.getElementById('mobile-menu-btn'),
-        mobileMenu: document.getElementById('mobile-menu'),
+    const PLACEHOLDER_HTML = el.outputPlaceholder ? el.outputPlaceholder.innerHTML : '';
 
-        // Settings Modal
-        settingsModal: document.getElementById('settings-modal'),
-        closeSettingsModal: document.getElementById('close-settings-modal'),
-        apiKeyInput: document.getElementById('api-key'),
-        modelSelect: document.getElementById('model-select'),
-        demoModeCheckbox: document.getElementById('demo-mode'),
-
-        // Demo Mode Indicator
-        demoModeIndicator: document.getElementById('demo-mode-indicator'),
-
-        // Setup Guide
-        setupGuide: document.getElementById('setup-guide'),
-        openSettingsBtn: document.getElementById('open-settings-btn'),
-
-        // API Notice
-        apiNotice: document.getElementById('api-notice'),
-        configureApiLink: document.getElementById('configure-api-link'),
-
-        // UI Components
-        progressContainer: document.getElementById('progress-container'),
-        progressFill = document.getElementById('progress-fill'),
-        progressPercent = document.getElementById('progress-percent'),
-        videoResult = document.getElementById('video-result'),
-        generatedVideo = document.getElementById('generated-video'),
-        outputPlaceholder = document.querySelector('.output-placeholder')
-    };
-    
-    // ==================== INITIALIZATION ====================
+    // ==================== INIT ====================
     function init() {
-        console.log('🔧 Initializing application...');
-
-        // Validate critical elements
-        if (!elements.generateBtn) {
-            console.error('❌ Generate button not found!');
-            return;
-        }
-
-        // Load saved API key
         loadSettings();
-
-        // Setup event listeners
-        setupEventListeners();
-
-        // Initialize character counter
-        if (elements.promptInput) {
-            elements.promptInput.addEventListener('input', updateCharCounter);
-        }
-
-        // Check API key status
+        bindEvents();
+        updateCharCounter();
+        enforceResolutionRules();
         checkApiKeyStatus();
-
-        console.log('✅ Application initialized successfully');
+        startClock();
+        if (el.year) el.year.textContent = new Date().getFullYear();
     }
-    
-    // ==================== EVENT LISTENERS ====================
-    function setupEventListeners() {
-        // Generate button - SINGLE event listener
-        elements.generateBtn.addEventListener('click', handleGenerateClick);
 
-        // Other buttons (if they exist)
-        if (elements.downloadBtn) {
-            elements.downloadBtn.addEventListener('click', downloadVideo);
-        }
+    function bindEvents() {
+        el.generateBtn?.addEventListener('click', handleGenerate);
+        el.downloadBtn?.addEventListener('click', downloadVideo);
+        el.shareBtn?.addEventListener('click', shareVideo);
+        el.prompt?.addEventListener('input', updateCharCounter);
+        el.prompt?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleGenerate();
+        });
+        el.resolution?.addEventListener('change', enforceResolutionRules);
 
-        if (elements.shareBtn) {
-            elements.shareBtn.addEventListener('click', shareVideo);
-        }
+        // Image-to-video
+        el.startImageInput?.addEventListener('change', handleImageSelected);
+        el.imageRemove?.addEventListener('click', clearStartImage);
 
-        // Settings modal
-        if (elements.settingsBtn) {
-            elements.settingsBtn.addEventListener('click', openSettingsModal);
-        }
+        // Settings
+        [el.settingsBtn, el.mobileSettingsBtn, el.openSettingsBtn].forEach(b => b?.addEventListener('click', openSettingsModal));
+        el.configureApiLink?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
+        el.closeSettingsModal?.addEventListener('click', closeSettingsModal);
+        el.saveSettingsBtn?.addEventListener('click', saveSettings);
+        el.settingsModal?.addEventListener('click', (e) => { if (e.target === el.settingsModal) closeSettingsModal(); });
+        el.modelSelect?.addEventListener('change', enforceResolutionRules);
 
-        if (elements.closeSettingsModal) {
-            elements.closeSettingsModal.addEventListener('click', closeSettingsModal);
-        }
+        // Navigation / CTAs
+        el.mobileMenuBtn?.addEventListener('click', () => el.mobileMenu?.classList.toggle('active'));
+        el.mobileMenu?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => el.mobileMenu.classList.remove('active')));
+        [el.tryFreeBtn, el.signupBtn].forEach(b => b?.addEventListener('click', () => {
+            document.querySelector('.generator-section')?.scrollIntoView({ behavior: 'smooth' });
+            setTimeout(() => el.prompt?.focus(), 500);
+        }));
 
-        if (elements.saveSettingsBtn) {
-            elements.saveSettingsBtn.addEventListener('click', saveSettings);
-        }
-
-        if (elements.configureApiLink) {
-            elements.configureApiLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                openSettingsModal();
-            });
-        }
-
-        if (elements.openSettingsBtn) {
-            elements.openSettingsBtn.addEventListener('click', () => {
-                openSettingsModal();
-            });
-        }
-
-        // Close modal on outside click
-        if (elements.settingsModal) {
-            elements.settingsModal.addEventListener('click', (e) => {
-                if (e.target === elements.settingsModal) {
-                    closeSettingsModal();
-                }
-            });
-        }
-
-        // Keyboard shortcut: Ctrl/Cmd + Enter
         document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                if (elements.promptInput === document.activeElement) {
-                    e.preventDefault();
-                    handleGenerateClick();
-                }
+            if (e.key === 'Escape') {
+                closeSettingsModal();
+                el.mobileMenu?.classList.remove('active');
             }
         });
-
-        console.log('🎯 Event listeners setup complete');
     }
-    
-    // ==================== MAIN GENERATION HANDLER ====================
-    async function handleGenerateClick() {
-        console.log('🖱️ Button clicked - START');
-        console.log('🎭 Demo mode status:', state.demoMode);
 
-        // Prevent multiple clicks
+    // ==================== GENERATION ====================
+    async function handleGenerate() {
         if (state.isGenerating) {
-            console.log('⏸️ Already generating, skipping');
-            showNotification('Please wait for current generation to complete', 'warning');
+            // Second click while running = cancel
+            state.abort?.abort();
             return;
         }
 
-        // Validate inputs
-        if (!validateInputs()) {
+        const prompt = el.prompt.value.trim();
+        if (prompt.length < 3) {
+            notify('Please enter a video description (at least 3 characters).', 'error');
+            el.prompt.focus();
             return;
         }
 
-        // Get form data
-        const formData = getFormData();
+        if (!state.demoMode && !API_CONFIG.API_KEY) {
+            notify('Add your Gemini API key in Settings, or turn on Demo Mode.', 'error');
+            openSettingsModal();
+            return;
+        }
 
-        // Update UI state
-        setGeneratingState(true);
+        const form = getFormData();
+        state.abort = new AbortController();
+        setGenerating(true);
+        showProgressUI();
 
         try {
-            // Show progress UI
-            showProgressUI();
-
-            // Check if demo mode is enabled
+            let result;
             if (state.demoMode) {
-                console.log('🎭 Demo mode enabled - using placeholder video');
-                showNotification('🎭 Demo mode: Generating placeholder video...', 'info');
-
-                // Simulate progress
-                await simulateProgress();
-
-                // Show success with placeholder
-                const demoResult = {
-                    success: true,
-                    video_url: getPlaceholderVideo(formData.style)
-                };
-                showSuccessUI(formData, demoResult);
-                showNotification('✅ Demo video generated successfully!', 'success');
+                result = await runDemo(form, state.abort.signal);
             } else {
-                console.log('🎬 Real API mode - calling ThankYou AI');
-                // Real API generation
-                const initResult = await sendGenerationRequest(formData);
-
-                if (initResult.success) {
-                    // Update state with task ID
-                    state.currentJobId = initResult.task_id;
-
-                    showNotification(`🎬 Video generation started! Task ID: ${initResult.task_id}`, 'info');
-
-                    // Poll for completion
-                    const finalResult = await pollGenerationStatus(initResult.task_id);
-
-                    if (finalResult.success) {
-                        // Show success UI with actual video
-                        showSuccessUI(formData, finalResult);
-                        showNotification('✅ Video generated successfully!', 'success');
-                    }
-                } else {
-                    throw new Error(initResult.error || 'Generation failed');
-                }
+                result = await generateWithVeo(form, state.abort.signal);
             }
-
-        } catch (error) {
-            console.error('❌ Generation error:', error);
-            showErrorUI(error.message);
-            showNotification(`❌ Error: ${error.message}`, 'error');
-
+            showSuccessUI(form, result);
+            notify('Video generated successfully!', 'success');
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                showErrorUI('Generation cancelled. (If Veo already started, it may still be billed.)', false);
+                notify('Generation cancelled.', 'info');
+            } else {
+                console.error('Generation error:', err);
+                showErrorUI(err.message, true);
+                notify(err.message, 'error');
+            }
         } finally {
-            // ALWAYS reset state
-            setGeneratingState(false);
-            console.log('🔄 Button state reset');
+            setGenerating(false);
+            stopTimers();
         }
+    }
 
-        console.log('🏁 Button clicked - END');
-    }
-    
-    // ==================== VALIDATION ====================
-    function validateInputs() {
-        if (!elements.promptInput) {
-            showNotification('Prompt input not found', 'error');
-            return false;
-        }
-        
-        const prompt = elements.promptInput.value.trim();
-        
-        if (!prompt) {
-            showNotification('Please enter a video description', 'error');
-            elements.promptInput.focus();
-            return false;
-        }
-        
-        if (prompt.length < 3) {
-            showNotification('Description must be at least 3 characters', 'error');
-            return false;
-        }
-        
-        return true;
-    }
-    
-    // ==================== FORM DATA ====================
     function getFormData() {
+        const style = el.style?.value || 'realistic';
+        const userPrompt = el.prompt.value.trim();
         return {
-            prompt: elements.promptInput.value.trim(),
-            style: elements.styleSelect ? elements.styleSelect.value : 'realistic',
-            length: elements.lengthSelect ? parseInt(elements.lengthSelect.value) : 5,
-            aspect_ratio: elements.aspectSelect ? elements.aspectSelect.value : '16:9',
-            model: elements.modelSelect ? elements.modelSelect.value : 'kling-v3'
+            userPrompt,
+            prompt: `${userPrompt}\n\nStyle: ${STYLE_HINTS[style] || ''}`.trim(),
+            style,
+            duration: el.length?.value || '8',
+            aspectRatio: el.aspect?.value || '16:9',
+            resolution: el.resolution?.value || '720p',
+            model: el.modelSelect?.value || API_CONFIG.MODEL,
+            image: state.startImage
         };
     }
-    
-    // ==================== API REQUEST ====================
-    async function sendGenerationRequest(formData) {
-        console.log('📤 Sending API request:', formData);
 
-        // Check if API key is configured
-        if (!API_CONFIG.API_KEY) {
-            throw new Error('API key not configured. Please set your ThankYou AI API key in the code or add it via the settings.');
+    // Veo rules: 1080p and 4K require 8s; Lite has no 4K.
+    function enforceResolutionRules() {
+        if (!el.resolution || !el.length) return;
+        const isLite = (el.modelSelect?.value || '').includes('lite');
+        const fourK = el.resolution.querySelector('option[value="4k"]');
+        if (fourK) {
+            fourK.disabled = isLite;
+            if (isLite && el.resolution.value === '4k') el.resolution.value = '1080p';
         }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
-
-        try {
-            // Prepare request body for ThankYou AI Kling API
-            const requestBody = {
-                model_name: formData.model || 'kling-v3',
-                prompt: formData.prompt,
-                mode: 'std', // Standard mode (can be 'pro' for higher quality)
-                aspect_ratio: formData.aspect_ratio,
-                duration: formData.length.toString(),
-                sound: 'on', // Enable audio generation
-                watermark_info: {
-                    enabled: false
-                }
-            };
-
-            console.log('📋 Request body:', requestBody);
-
-            const response = await fetch(API_CONFIG.BASE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${API_CONFIG.API_KEY}`
-                },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            console.log('📥 Response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ API Error:', errorText);
-
-                // Handle specific error codes
-                if (response.status === 402) {
-                    throw new Error('Insufficient credits. Please add credits to your ThankYou AI account at thankyouai.com/dashboard');
-                } else if (response.status === 401) {
-                    throw new Error('Invalid API key. Please check your settings.');
-                } else if (response.status === 429) {
-                    throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-                }
-
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
-            }
-
-            const data = await response.json();
-            console.log('✅ API response:', data);
-
-            // Return task_id for polling
-            return {
-                success: true,
-                task_id: data.data?.task_id || data.task_id,
-                data: data
-            };
-
-        } catch (error) {
-            clearTimeout(timeoutId);
-            throw error;
-        }
+        const needs8 = el.resolution.value !== '720p';
+        [...el.length.options].forEach(o => { o.disabled = needs8 && o.value !== '8'; });
+        if (needs8) el.length.value = '8';
     }
 
-    // ==================== STATUS POLLING ====================
-    async function pollGenerationStatus(taskId) {
-        console.log('🔄 Polling status for task:', taskId);
-
-        let attempts = 0;
-
-        while (attempts < API_CONFIG.MAX_POLL_ATTEMPTS) {
-            attempts++;
-
-            try {
-                const response = await fetch(`${API_CONFIG.STATUS_URL}/${taskId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${API_CONFIG.API_KEY}`,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Status check failed: HTTP ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log(`📊 Poll attempt ${attempts}:`, data);
-
-                const taskStatus = data.data?.task_status || data.task_status;
-
-                // Update progress based on status
-                updateProgressFromStatus(taskStatus, attempts);
-
-                if (taskStatus === 'succeed') {
-                    console.log('✅ Generation completed successfully');
-                    return {
-                        success: true,
-                        video_url: data.data?.task_result?.video_url || data.task_result?.video_url,
-                        data: data
-                    };
-                } else if (taskStatus === 'failed') {
-                    throw new Error('Video generation failed on the server');
-                }
-
-                // Wait before next poll
-                await new Promise(resolve => setTimeout(resolve, API_CONFIG.POLL_INTERVAL));
-
-            } catch (error) {
-                console.error('❌ Polling error:', error);
-                if (attempts >= API_CONFIG.MAX_POLL_ATTEMPTS) {
-                    throw error;
-                }
-                await new Promise(resolve => setTimeout(resolve, API_CONFIG.POLL_INTERVAL));
-            }
-        }
-
-        throw new Error('Generation timed out after maximum attempts');
-    }
-
-    // ==================== DEMO MODE SIMULATION ====================
-    async function simulateProgress() {
-        return new Promise((resolve) => {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 2;
-                if (progress > 95) {
-                    progress = 95;
-                }
-
-                // Update progress bar
-                if (elements.progressFill) {
-                    elements.progressFill.style.width = `${progress}%`;
-                }
-                if (elements.progressPercent) {
-                    elements.progressPercent.textContent = `${Math.round(progress)}%`;
-                }
-
-                // Update steps
-                const steps = document.querySelectorAll('.step');
-                const activeStep = Math.floor(progress / 25);
-                steps.forEach((step, index) => {
-                    if (index === activeStep) {
-                        step.classList.add('active');
-                    } else {
-                        step.classList.remove('active');
-                    }
-                });
-
-                if (progress >= 95) {
-                    clearInterval(interval);
-                    setTimeout(resolve, 500);
-                }
-            }, 100);
-        });
-    }
-
-    // ==================== PROGRESS UPDATE ====================
-    function updateProgressFromStatus(status, attempt) {
-        let progress = 0;
-        let activeStep = 0;
-
-        if (status === 'submitted') {
-            progress = 10;
-            activeStep = 0;
-        } else if (status === 'processing') {
-            // Gradually increase progress during processing
-            progress = Math.min(10 + (attempt * 1.5), 90);
-            activeStep = Math.min(Math.floor(attempt / 15), 3);
-        }
-
-        // Update progress bar
-        if (elements.progressFill) {
-            elements.progressFill.style.width = `${progress}%`;
-        }
-        if (elements.progressPercent) {
-            elements.progressPercent.textContent = `${Math.round(progress)}%`;
-        }
-
-        // Update active step
-        const steps = document.querySelectorAll('.step');
-        steps.forEach((step, index) => {
-            if (index === activeStep) {
-                step.classList.add('active');
-            } else {
-                step.classList.remove('active');
+    async function veoFetch(url, options = {}) {
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                'x-goog-api-key': API_CONFIG.API_KEY,
+                ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+                ...(options.headers || {})
             }
         });
+        let data = null;
+        try { data = await res.json(); } catch { /* non-JSON */ }
+        if (!res.ok) throw new Error(friendlyApiError(res.status, data));
+        return data;
     }
-    
-    // ==================== UI STATE MANAGEMENT ====================
-    function setGeneratingState(isGenerating) {
-        state.isGenerating = isGenerating;
-        
-        if (elements.generateBtn) {
-            elements.generateBtn.disabled = isGenerating;
-            elements.generateBtn.innerHTML = isGenerating 
-                ? '<i class="fas fa-spinner fa-spin"></i> Processing...' 
-                : '<i class="fas fa-bolt"></i> Generate Video';
-        }
-        
-        // Clear any existing timer
-        if (state.generationTimer) {
-            clearInterval(state.generationTimer);
-            state.generationTimer = null;
-        }
+
+    function friendlyApiError(status, data) {
+        const msg = data?.error?.message || `HTTP ${status}`;
+        if (status === 400 && /API key not valid/i.test(msg)) return 'Invalid Gemini API key. Check it in Settings.';
+        if (status === 403) return `Permission denied: ${msg}. Make sure the Generative Language API is enabled for your key.`;
+        if (status === 404) return `Model not found: ${msg}. Try a different Veo model in Settings.`;
+        if (status === 429) return `Quota or rate limit reached: ${msg}. Veo needs billing enabled on your Gemini API project.`;
+        return msg;
     }
-    
+
+    async function generateWithVeo(form, signal) {
+        // 1) Start the long-running operation
+        setStep(0, 5);
+        const instance = { prompt: form.prompt };
+        if (form.image) {
+            instance.image = { inlineData: { mimeType: form.image.mimeType, data: form.image.data } };
+        }
+        const body = {
+            instances: [instance],
+            parameters: {
+                aspectRatio: form.aspectRatio,
+                resolution: form.resolution,
+                durationSeconds: Number(form.duration)
+            }
+        };
+
+        const op = await veoFetch(`${API_CONFIG.BASE_URL}/models/${form.model}:predictLongRunning`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+            signal
+        });
+        if (!op?.name) throw new Error('Unexpected response from Gemini API (no operation name).');
+        console.log('Veo operation started:', op.name);
+
+        // 2) Poll until done
+        setStep(1, 10);
+        startFakeProgress(10, 85, 150000); // creep toward 85% over ~2.5 min
+        let operation = op;
+        while (!operation.done) {
+            if (Date.now() - state.startTime > API_CONFIG.MAX_WAIT_MS) {
+                throw new Error('Veo is taking unusually long. Please try again later.');
+            }
+            await sleep(API_CONFIG.POLL_INTERVAL, signal);
+            operation = await veoFetch(`${API_CONFIG.BASE_URL}/${op.name}`, { signal });
+        }
+
+        if (operation.error) {
+            throw new Error(`Veo error: ${operation.error.message || 'generation failed'}`);
+        }
+
+        const resp = operation.response?.generateVideoResponse;
+        const sample = resp?.generatedSamples?.[0];
+        const uri = sample?.video?.uri;
+        if (!uri) {
+            const reasons = resp?.raiMediaFilteredReasons;
+            if (reasons?.length) throw new Error(`Blocked by Google's safety filters: ${reasons.join(' ')} Try rewording your prompt.`);
+            throw new Error('Veo finished but returned no video. Try rewording your prompt.');
+        }
+
+        // 3) Download the MP4 (needs the API key)
+        stopFakeProgress();
+        setStep(2, 90);
+        const blob = await downloadVeoVideo(uri, signal);
+        setStep(3, 100);
+        return { blob, url: URL.createObjectURL(blob), remoteUri: uri };
+    }
+
+    async function downloadVeoVideo(uri, signal) {
+        // Pass the key as a query param so the request stays "simple" (no CORS preflight)
+        const keyed = uri + (uri.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(API_CONFIG.API_KEY);
+        const res = await fetch(keyed, { signal });
+        if (!res.ok) throw new Error(`Could not download the video (HTTP ${res.status}).`);
+        return res.blob();
+    }
+
+    async function runDemo(form, signal) {
+        setStep(0, 5);
+        await sleep(800, signal);
+        setStep(1, 10);
+        startFakeProgress(10, 90, 4000);
+        await sleep(4500, signal);
+        setStep(3, 100);
+        const url = DEMO_VIDEOS[Math.floor(Math.random() * DEMO_VIDEOS.length)];
+        return { blob: null, url, remoteUri: url };
+    }
+
+    // ==================== PROGRESS UI ====================
+    function setStep(index, percent) {
+        document.querySelectorAll('.progress-steps .step').forEach((s, i) => {
+            s.classList.toggle('active', i === index);
+            s.classList.toggle('done', i < index);
+        });
+        if (percent != null) setProgress(percent);
+    }
+
+    function setProgress(p) {
+        const v = Math.max(0, Math.min(100, p));
+        if (el.progressFill) el.progressFill.style.width = `${v}%`;
+        if (el.progressPercent) el.progressPercent.textContent = `${Math.round(v)}%`;
+    }
+
+    function startFakeProgress(from, to, durationMs) {
+        stopFakeProgress();
+        const t0 = Date.now();
+        state.progressTimer = setInterval(() => {
+            const t = Math.min(1, (Date.now() - t0) / durationMs);
+            // ease-out so it slows down but never stalls completely
+            setProgress(from + (to - from) * (1 - Math.pow(1 - t, 2)));
+        }, 250);
+    }
+
+    function stopFakeProgress() {
+        clearInterval(state.progressTimer);
+        state.progressTimer = null;
+    }
+
+    function stopTimers() {
+        stopFakeProgress();
+        clearInterval(state.elapsedTimer);
+        state.elapsedTimer = null;
+    }
+
     function showProgressUI() {
-        // Hide previous results
-        if (elements.videoResult) {
-            elements.videoResult.style.display = 'none';
+        if (el.videoResult) el.videoResult.style.display = 'none';
+        if (el.outputPlaceholder) el.outputPlaceholder.style.display = 'none';
+        if (el.progressContainer) el.progressContainer.style.display = 'block';
+        if (el.progressNote) {
+            el.progressNote.textContent = state.demoMode
+                ? 'Demo Mode: showing a sample video, no API call is made.'
+                : 'Veo usually takes 1–6 minutes. Keep this tab open. Click the button again to cancel.';
         }
-        
-        if (elements.outputPlaceholder) {
-            elements.outputPlaceholder.style.display = 'none';
-        }
-        
-        // Show progress
-        if (elements.progressContainer) {
-            elements.progressContainer.style.display = 'block';
-            
-            // Reset progress bar
-            if (elements.progressFill) {
-                elements.progressFill.style.width = '0%';
-            }
-            if (elements.progressPercent) {
-                elements.progressPercent.textContent = '0%';
-            }
-        }
-        
-        // Start progress animation
-        startProgressAnimation();
+        setStep(0, 0);
+
+        state.startTime = Date.now();
+        const tick = () => {
+            const s = Math.floor((Date.now() - state.startTime) / 1000);
+            if (el.progressElapsed) el.progressElapsed.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        };
+        tick();
+        state.elapsedTimer = setInterval(tick, 1000);
     }
-    
-    function startProgressAnimation() {
-        let progress = 0;
-        
-        state.generationTimer = setInterval(() => {
-            progress += 0.5;
-            
-            // Cap at 95% until API response
-            if (progress > 95) {
-                progress = 95;
-            }
-            
-            // Update progress bar
-            if (elements.progressFill) {
-                elements.progressFill.style.width = `${progress}%`;
-            }
-            if (elements.progressPercent) {
-                elements.progressPercent.textContent = `${Math.round(progress)}%`;
-            }
-            
-        }, 100);
+
+    function setGenerating(on) {
+        state.isGenerating = on;
+        if (!el.generateBtn) return;
+        el.generateBtn.classList.toggle('is-cancel', on);
+        el.generateBtn.innerHTML = on
+            ? '<i class="fas fa-spinner fa-spin"></i> Generating… (click to cancel)'
+            : '<i class="fas fa-bolt"></i> Generate Video with Veo';
     }
-    
-    function showSuccessUI(formData, apiResult) {
-        // Complete progress animation
-        if (state.generationTimer) {
-            clearInterval(state.generationTimer);
-            state.generationTimer = null;
+
+    function showSuccessUI(form, result) {
+        if (state.currentVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(state.currentVideoUrl);
+        state.currentVideoUrl = result.url;
+        state.currentVideoBlob = result.blob;
+
+        if (el.progressContainer) el.progressContainer.style.display = 'none';
+        if (el.videoResult) el.videoResult.style.display = 'block';
+
+        const v = el.generatedVideo;
+        if (v) {
+            v.src = result.url;
+            v.load();
+            v.play().catch(() => { /* autoplay may be blocked */ });
         }
 
-        // Set progress to 100%
-        if (elements.progressFill) {
-            elements.progressFill.style.width = '100%';
-        }
-        if (elements.progressPercent) {
-            elements.progressPercent.textContent = '100%';
-        }
+        setText('video-title', form.userPrompt.length > 70 ? form.userPrompt.slice(0, 70) + '…' : form.userPrompt);
+        setText('video-duration', `${form.duration}s`);
+        setText('video-style-result', el.style?.selectedOptions[0]?.textContent || form.style);
+        setText('video-ratio', `${form.aspectRatio} · ${form.resolution}`);
+        setText('video-model', state.demoMode ? 'Demo' : (MODEL_NAMES[form.model] || form.model));
 
-        // Hide progress after delay
-        setTimeout(() => {
-            if (elements.progressContainer) {
-                elements.progressContainer.style.display = 'none';
-            }
-
-            // Show video result
-            if (elements.videoResult) {
-                elements.videoResult.style.display = 'block';
-
-                // Set video source from API result or fallback to placeholder
-                if (elements.generatedVideo) {
-                    const videoUrl = apiResult.video_url || getPlaceholderVideo(formData.style);
-                    elements.generatedVideo.src = videoUrl;
-                    state.currentVideoUrl = videoUrl;
-
-                    // Update video info
-                    const durationEl = document.getElementById('video-duration');
-                    const styleEl = document.getElementById('video-style-result');
-                    const ratioEl = document.getElementById('video-ratio');
-
-                    if (durationEl) durationEl.textContent = `${formData.length}s`;
-                    if (styleEl) styleEl.textContent = formData.style.charAt(0).toUpperCase() + formData.style.slice(1);
-                    if (ratioEl) ratioEl.textContent = formData.aspect_ratio;
-
-                    // Try to autoplay
-                    setTimeout(() => {
-                        elements.generatedVideo.play().catch(e => {
-                            console.log('Autoplay prevented:', e.message);
-                        });
-                    }, 500);
-                }
-
-                // Enable download/share buttons
-                if (elements.downloadBtn) elements.downloadBtn.disabled = false;
-                if (elements.shareBtn) elements.shareBtn.disabled = false;
-            }
-        }, 1000);
+        if (el.downloadBtn) el.downloadBtn.disabled = false;
+        if (el.shareBtn) el.shareBtn.disabled = false;
     }
-    
-    function showErrorUI(errorMessage) {
-        // Stop progress animation
-        if (state.generationTimer) {
-            clearInterval(state.generationTimer);
-            state.generationTimer = null;
-        }
 
-        // Hide progress
-        if (elements.progressContainer) {
-            elements.progressContainer.style.display = 'none';
-        }
-
-        // Show error message
-        if (elements.outputPlaceholder) {
-            elements.outputPlaceholder.style.display = 'block';
-
-            // Check if it's a credits error
-            const isCreditsError = errorMessage.toLowerCase().includes('credits') || errorMessage.toLowerCase().includes('billing');
-
-            let actionButtons = '';
-            if (isCreditsError) {
-                actionButtons = `
-                    <a href="https://thankyouai.com/dashboard" target="_blank" style="
-                        display: inline-block;
-                        background: #ff6b00;
-                        color: white;
-                        text-decoration: none;
-                        padding: 0.75rem 1.5rem;
-                        border-radius: 4px;
-                        margin-right: 0.5rem;
-                        cursor: pointer;
-                    ">
-                        <i class="fas fa-credit-card"></i> Add Credits
-                    </a>
-                    <button id="enable-demo-btn" style="
-                        background: #4a6fa5;
-                        color: white;
-                        border: none;
-                        padding: 0.75rem 1.5rem;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        margin-right: 0.5rem;
-                    ">
-                        <i class="fas fa-play-circle"></i> Try Demo Mode
-                    </button>
-                `;
-            }
-
-            elements.outputPlaceholder.innerHTML = `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff6b6b; margin-bottom: 1rem;"></i>
-                    <h4 style="margin-bottom: 0.5rem;">Generation Failed</h4>
-                    <p style="color: #666; margin-bottom: 1.5rem;">${errorMessage}</p>
-                    <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
-                        ${actionButtons}
-                        <button id="retry-btn" style="
-                            background: #4a6fa5;
-                            color: white;
-                            border: none;
-                            padding: 0.75rem 1.5rem;
-                            border-radius: 4px;
-                            cursor: pointer;
-                        ">
-                            <i class="fas fa-redo"></i> Try Again
-                        </button>
-                    </div>
+    function showErrorUI(message, showRetry) {
+        if (el.progressContainer) el.progressContainer.style.display = 'none';
+        if (!el.outputPlaceholder) return;
+        el.outputPlaceholder.style.display = 'block';
+        el.outputPlaceholder.innerHTML = `
+            <div class="output-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h4>${showRetry ? 'Generation Failed' : 'Stopped'}</h4>
+                <p>${escapeHtml(message)}</p>
+                <div class="output-error-actions">
+                    ${showRetry ? '<button class="btn btn-primary btn-sm" id="retry-btn"><i class="fas fa-redo"></i> Try Again</button>' : ''}
+                    <button class="btn btn-outline btn-sm" id="reset-btn"><i class="fas fa-times"></i> Dismiss</button>
                 </div>
-            `;
-
-            // Add retry button listener
-            const retryBtn = document.getElementById('retry-btn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    elements.outputPlaceholder.innerHTML = `
-                        <div class="placeholder-icon">
-                            <i class="fas fa-film"></i>
-                        </div>
-                        <h4>Your Video Will Appear Here</h4>
-                        <p>Enter description and click "Generate Video" to start</p>
-                    `;
-                });
-            }
-
-            // Add demo mode button listener
-            const enableDemoBtn = document.getElementById('enable-demo-btn');
-            if (enableDemoBtn) {
-                enableDemoBtn.addEventListener('click', () => {
-                    state.demoMode = true;
-                    localStorage.setItem('stark_demo_mode', 'true');
-                    if (elements.demoModeCheckbox) {
-                        elements.demoModeCheckbox.checked = true;
-                    }
-                    updateDemoModeIndicator();
-                    checkApiKeyStatus();
-                    showNotification('Demo mode enabled! Using placeholder videos.', 'info');
-                    elements.outputPlaceholder.innerHTML = `
-                        <div class="placeholder-icon">
-                            <i class="fas fa-film"></i>
-                        </div>
-                        <h4>Your Video Will Appear Here</h4>
-                        <p>Enter description and click "Generate Video" to start</p>
-                    `;
-                });
-            }
-        }
-    }
-    
-    // ==================== SETTINGS MANAGEMENT ====================
-    function checkApiKeyStatus() {
-        if (elements.apiNotice) {
-            if (!API_CONFIG.API_KEY && !state.demoMode) {
-                elements.apiNotice.style.display = 'flex';
-            } else {
-                elements.apiNotice.style.display = 'none';
-            }
-        }
-
-        // Show/hide setup guide
-        if (elements.setupGuide) {
-            if (!API_CONFIG.API_KEY && !state.demoMode) {
-                elements.setupGuide.classList.add('active');
-            } else {
-                elements.setupGuide.classList.remove('active');
-            }
-        }
+            </div>`;
+        $('retry-btn')?.addEventListener('click', () => { resetPlaceholder(); handleGenerate(); });
+        $('reset-btn')?.addEventListener('click', resetPlaceholder);
     }
 
-    function updateDemoModeIndicator() {
-        if (elements.demoModeIndicator) {
-            elements.demoModeIndicator.style.display = state.demoMode ? 'flex' : 'none';
+    function resetPlaceholder() {
+        if (el.outputPlaceholder) el.outputPlaceholder.innerHTML = PLACEHOLDER_HTML;
+    }
+
+    // ==================== IMAGE-TO-VIDEO ====================
+    function handleImageSelected(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+            notify('Please choose a PNG, JPEG or WebP image.', 'error');
+            return;
+        }
+        if (file.size > 15 * 1024 * 1024) {
+            notify('Image is too large (max 15 MB).', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result;
+            state.startImage = { mimeType: file.type, data: dataUrl.split(',')[1], dataUrl };
+            if (el.imagePreviewImg) el.imagePreviewImg.src = dataUrl;
+            if (el.imagePreview) el.imagePreview.hidden = false;
+            if (el.imageUploadText) el.imageUploadText.textContent = `Starting image: ${file.name}`;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearStartImage() {
+        state.startImage = null;
+        if (el.startImageInput) el.startImageInput.value = '';
+        if (el.imagePreview) el.imagePreview.hidden = true;
+        if (el.imageUploadText) el.imageUploadText.textContent = 'Optional: add a starting image (image-to-video)';
+    }
+
+    // ==================== DOWNLOAD / SHARE ====================
+    function downloadVideo() {
+        if (!state.currentVideoUrl) return notify('No video to download yet.', 'error');
+        const a = document.createElement('a');
+        a.href = state.currentVideoUrl;
+        a.download = `stark-veo-${Date.now()}.mp4`;
+        if (!state.currentVideoBlob) a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        notify('Download started.', 'info');
+    }
+
+    async function shareVideo() {
+        if (!state.currentVideoUrl) return notify('No video to share yet.', 'error');
+        try {
+            if (state.currentVideoBlob && navigator.canShare) {
+                const file = new File([state.currentVideoBlob], 'stark-veo-video.mp4', { type: 'video/mp4' });
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: 'AI video made with Stark + Google Veo' });
+                    return;
+                }
+            }
+            notify('Your browser can\'t share video files directly. Download it and share the file instead.', 'info');
+        } catch (err) {
+            if (err.name !== 'AbortError') notify('Sharing failed.', 'error');
         }
     }
 
+    // ==================== SETTINGS ====================
     function loadSettings() {
-        const savedApiKey = localStorage.getItem('stark_api_key');
-        const savedModel = localStorage.getItem('stark_model');
-        const savedDemoMode = localStorage.getItem('stark_demo_mode');
-
-        if (savedApiKey) {
-            API_CONFIG.API_KEY = savedApiKey;
-            if (elements.apiKeyInput) {
-                elements.apiKeyInput.value = savedApiKey;
-            }
-        }
-
-        if (savedModel && elements.modelSelect) {
-            elements.modelSelect.value = savedModel;
-        }
-
-        if (savedDemoMode !== null && elements.demoModeCheckbox) {
-            state.demoMode = savedDemoMode === 'true';
-            elements.demoModeCheckbox.checked = state.demoMode;
-        }
-
+        try {
+            API_CONFIG.API_KEY = localStorage.getItem('stark_gemini_api_key') || API_CONFIG.API_KEY;
+            const model = localStorage.getItem('stark_veo_model');
+            state.demoMode = localStorage.getItem('stark_demo_mode') === 'true';
+            if (model && el.modelSelect && MODEL_NAMES[model]) el.modelSelect.value = model;
+        } catch { /* storage unavailable */ }
+        if (el.apiKeyInput) el.apiKeyInput.value = API_CONFIG.API_KEY;
+        if (el.demoModeCheckbox) el.demoModeCheckbox.checked = state.demoMode;
         updateDemoModeIndicator();
-        console.log('📝 Settings loaded');
     }
 
     function saveSettings() {
-        const apiKey = elements.apiKeyInput.value.trim();
-        const model = elements.modelSelect.value;
-        const demoMode = elements.demoModeCheckbox ? elements.demoModeCheckbox.checked : false;
-
-        // Save to localStorage
-        if (apiKey) {
-            localStorage.setItem('stark_api_key', apiKey);
-            API_CONFIG.API_KEY = apiKey;
-        }
-        localStorage.setItem('stark_model', model);
-        localStorage.setItem('stark_demo_mode', demoMode.toString());
-
-        // Update state
-        state.demoMode = demoMode;
-
-        // Update UI
+        const key = el.apiKeyInput?.value.trim() || '';
+        API_CONFIG.API_KEY = key;
+        state.demoMode = !!el.demoModeCheckbox?.checked;
+        try {
+            if (key) localStorage.setItem('stark_gemini_api_key', key);
+            else localStorage.removeItem('stark_gemini_api_key');
+            localStorage.setItem('stark_veo_model', el.modelSelect?.value || API_CONFIG.MODEL);
+            localStorage.setItem('stark_demo_mode', String(state.demoMode));
+        } catch { /* storage unavailable */ }
         updateDemoModeIndicator();
         checkApiKeyStatus();
-
-        showNotification('Settings saved successfully!', 'success');
+        enforceResolutionRules();
         closeSettingsModal();
+        notify('Settings saved.', 'success');
+    }
+
+    function checkApiKeyStatus() {
+        const missing = !API_CONFIG.API_KEY && !state.demoMode;
+        if (el.apiNotice) el.apiNotice.style.display = 'none';
+        el.setupGuide?.classList.toggle('active', missing);
+    }
+
+    function updateDemoModeIndicator() {
+        if (el.demoModeIndicator) el.demoModeIndicator.style.display = state.demoMode ? 'flex' : 'none';
     }
 
     function openSettingsModal() {
-        if (elements.settingsModal) {
-            elements.settingsModal.style.display = 'flex';
-        }
+        if (el.settingsModal) el.settingsModal.style.display = 'flex';
+        setTimeout(() => el.apiKeyInput?.focus(), 50);
     }
 
     function closeSettingsModal() {
-        if (elements.settingsModal) {
-            elements.settingsModal.style.display = 'none';
-        }
+        if (el.settingsModal) el.settingsModal.style.display = 'none';
     }
 
-    // ==================== HELPER FUNCTIONS ====================
+    // ==================== HELPERS ====================
     function updateCharCounter() {
-        const charCount = document.getElementById('char-count');
-        if (charCount && elements.promptInput) {
-            const length = elements.promptInput.value.length;
-            charCount.textContent = `${length}/500`;
-            
-            // Color coding
-            if (length < 50) {
-                charCount.style.color = '#ff6b6b';
-            } else if (length < 150) {
-                charCount.style.color = '#ffa726';
-            } else {
-                charCount.style.color = '#4CAF50';
-            }
-        }
+        if (!el.charCount || !el.prompt) return;
+        const n = el.prompt.value.length;
+        el.charCount.textContent = `${n}/500`;
+        el.charCount.style.color = n < 50 ? '#ff6b6b' : n < 150 ? '#ffa726' : '#4CAF50';
     }
-    
-    function getPlaceholderVideo(style) {
-        const placeholders = {
-            realistic: 'https://assets.mixkit.co/videos/preview/mixkit-sunset-over-a-lake-1867-large.mp4',
-            anime: 'https://assets.mixkit.co/videos/preview/mixkit-anime-style-magic-sparkles-1412-large.mp4',
-            cinematic: 'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-a-road-going-through-a-forest-4152-large.mp4',
-            '3d-animation': 'https://assets.mixkit.co/videos/preview/mixkit-geometric-abstract-animation-1612-large.mp4',
-            artistic: 'https://assets.mixkit.co/videos/preview/mixkit-ink-colors-in-water-artistic-1231-large.mp4',
-            cartoon: 'https://assets.mixkit.co/videos/preview/mixkit-cartoon-character-running-in-a-forest-4150-large.mp4'
+
+    function startClock() {
+        if (!el.currentTime) return;
+        const tick = () => {
+            el.currentTime.innerHTML = `<i class="fas fa-clock"></i> ${new Date().toLocaleTimeString()}`;
         };
-        
-        return placeholders[style] || placeholders.realistic;
+        tick();
+        setInterval(tick, 1000);
     }
-    
-    function downloadVideo() {
-        if (!state.currentVideoUrl) {
-            showNotification('No video to download', 'error');
-            return;
-        }
-        
-        const link = document.createElement('a');
-        link.href = state.currentVideoUrl;
-        link.download = `stark-video-${Date.now()}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showNotification('Download started', 'info');
+
+    function setText(id, text) {
+        const node = $(id);
+        if (node) node.textContent = text;
     }
-    
-    function shareVideo() {
-        if (!state.currentJobId) {
-            showNotification('No video to share', 'error');
-            return;
-        }
-        
-        const shareUrl = `${window.location.origin}/video/${state.currentJobId}`;
-        
-        if (navigator.share) {
-            // Use Web Share API if available
-            navigator.share({
-                title: 'Stark AI Generated Video',
-                text: 'Check out this AI-generated video!',
-                url: shareUrl
-            });
-        } else {
-            // Fallback to copy link
-            navigator.clipboard.writeText(shareUrl)
-                .then(() => showNotification('Link copied to clipboard!', 'success'))
-                .catch(() => showNotification('Failed to copy link', 'error'));
-        }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
-    
-    function showNotification(message, type = 'info') {
-        // Remove existing notification
-        const existing = document.querySelector('.stark-notification');
-        if (existing) existing.remove();
-        
-        // Create notification
-        const notification = document.createElement('div');
-        notification.className = `stark-notification stark-notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                <span>${message}</span>
-            </div>
-            <button class="notification-close">&times;</button>
-        `;
-        
-        // Add styles
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
-        `;
-        
-        notification.querySelector('.notification-content').style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        `;
-        
-        notification.querySelector('.notification-close').style.cssText = `
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            margin-left: 1rem;
-            padding: 0 0.5rem;
-        `;
-        
-        // Add close functionality
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
+
+    function sleep(ms, signal) {
+        return new Promise((resolve, reject) => {
+            if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+            const t = setTimeout(resolve, ms);
+            signal?.addEventListener('abort', () => {
+                clearTimeout(t);
+                reject(new DOMException('Aborted', 'AbortError'));
+            }, { once: true });
         });
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 5000);
-        
-        // Add animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
-        
-        document.body.appendChild(notification);
     }
-    
-    // ==================== START APPLICATION ====================
+
+    function notify(message, type = 'info') {
+        document.querySelector('.stark-notification')?.remove();
+        const n = document.createElement('div');
+        n.className = `stark-notification stark-notification-${type}`;
+        const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
+        n.innerHTML = `<i class="fas fa-${icon}"></i><span></span><button class="notification-close" aria-label="Close">&times;</button>`;
+        n.querySelector('span').textContent = message;
+        n.querySelector('.notification-close').addEventListener('click', () => n.remove());
+        document.body.appendChild(n);
+        setTimeout(() => n.remove(), type === 'error' ? 8000 : 5000);
+    }
+
     init();
 });

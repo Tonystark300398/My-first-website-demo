@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stark Video AI - Professional AI Video Generation</title>
+    <title>Stark Video AI - AI Video Generation with Google Veo</title>
     <meta name="description" content="Create high-quality AI videos with Stark's advanced technology. Convert text to video in seconds.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -131,7 +131,7 @@
                                 <h4>Quick Setup Required</h4>
                                 <p>To generate videos, you need either:</p>
                                 <ul>
-                                    <li><strong>Option 1:</strong> Add your ThankYou AI API key in Settings</li>
+                                    <li><strong>Option 1:</strong> Add your Google Gemini API key in Settings (get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>)</li>
                                     <li><strong>Option 2:</strong> Enable Demo Mode in Settings (no API key needed)</li>
                                 </ul>
                                 <button class="btn btn-primary btn-sm" id="open-settings-btn">
@@ -158,38 +158,55 @@
                             <label for="video-style"><i class="fas fa-palette"></i> Video Style</label>
                             <select id="video-style" class="style-select">
                                 <option value="realistic">Realistic</option>
-                                <option value="anime">Anime</option>
                                 <option value="cinematic">Cinematic</option>
+                                <option value="anime">Anime</option>
                                 <option value="3d-animation">3D Animation</option>
                                 <option value="artistic">Artistic</option>
                                 <option value="cartoon">Cartoon</option>
                             </select>
                         </div>
-                        
+
                         <div class="option-group">
                             <label for="video-length"><i class="fas fa-clock"></i> Video Length</label>
                             <select id="video-length" class="length-select">
-                                <option value="5">5 seconds</option>
-                                <option value="10">10 seconds</option>
-                                <option value="15">15 seconds</option>
-                                <option value="20">20 seconds</option>
-                                <option value="30">30 seconds</option>
+                                <option value="4">4 seconds</option>
+                                <option value="6">6 seconds</option>
+                                <option value="8" selected>8 seconds</option>
                             </select>
                         </div>
-                        
+
                         <div class="option-group">
                             <label for="aspect-ratio"><i class="fas fa-expand"></i> Aspect Ratio</label>
                             <select id="aspect-ratio" class="ratio-select">
                                 <option value="16:9">16:9 (Widescreen)</option>
-                                <option value="9:16">9:16 (Vertical)</option>
-                                <option value="1:1">1:1 (Square)</option>
-                                <option value="4:5">4:5 (Instagram)</option>
+                                <option value="9:16">9:16 (Vertical / Shorts)</option>
+                            </select>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="video-resolution"><i class="fas fa-tv"></i> Resolution</label>
+                            <select id="video-resolution" class="style-select">
+                                <option value="720p">720p (fastest)</option>
+                                <option value="1080p">1080p (8s only)</option>
+                                <option value="4k">4K (8s only)</option>
                             </select>
                         </div>
                     </div>
-                    
+
+                    <div class="image-upload" id="image-upload">
+                        <label class="image-upload-label" for="start-image">
+                            <i class="fas fa-image"></i>
+                            <span id="image-upload-text">Optional: add a starting image (image-to-video)</span>
+                        </label>
+                        <input type="file" id="start-image" accept="image/png,image/jpeg,image/webp" hidden>
+                        <div class="image-preview" id="image-preview" hidden>
+                            <img id="image-preview-img" alt="Starting frame preview">
+                            <button type="button" class="image-remove" id="image-remove" title="Remove image">&times;</button>
+                        </div>
+                    </div>
+
                     <button class="btn btn-generate" id="generate-btn">
-                        <i class="fas fa-bolt"></i> Generate Video with Stark AI
+                        <i class="fas fa-bolt"></i> Generate Video with Veo
                     </button>
                     
                     <div class="disclaimer">
@@ -221,18 +238,19 @@
                         
                         <div class="generation-progress" id="progress-container">
                             <div class="progress-header">
-                                <h4>Generating Video with Stark AI</h4>
+                                <h4>Generating with Google Veo <span class="progress-elapsed" id="progress-elapsed">0:00</span></h4>
                                 <div class="progress-percent" id="progress-percent">0%</div>
                             </div>
                             <div class="progress-bar">
                                 <div class="progress-fill" id="progress-fill"></div>
                             </div>
                             <div class="progress-steps">
-                                <div class="step active"><i class="fas fa-font"></i> Text Analysis</div>
-                                <div class="step"><i class="fas fa-brain"></i> AI Generating Images</div>
-                                <div class="step"><i class="fas fa-play-circle"></i> Creating Video Motion</div>
-                                <div class="step"><i class="fas fa-music"></i> Adding Sound & Finalizing</div>
+                                <div class="step active"><i class="fas fa-paper-plane"></i> Sending Request</div>
+                                <div class="step"><i class="fas fa-brain"></i> Veo Generating Video</div>
+                                <div class="step"><i class="fas fa-cloud-download-alt"></i> Downloading Video</div>
+                                <div class="step"><i class="fas fa-check-circle"></i> Ready to Play</div>
                             </div>
+                            <p class="progress-note" id="progress-note">Veo usually takes 1–6 minutes. Keep this tab open.</p>
                         </div>
                         
                         <div class="video-result" id="video-result">
@@ -243,9 +261,10 @@
                             <div class="video-info">
                                 <h4 id="video-title">Generated Video</h4>
                                 <div class="video-details">
-                                    <span><i class="fas fa-clock"></i> <span id="video-duration">10s</span></span>
+                                    <span><i class="fas fa-clock"></i> <span id="video-duration">8s</span></span>
                                     <span><i class="fas fa-palette"></i> <span id="video-style-result">Realistic</span></span>
                                     <span><i class="fas fa-expand"></i> <span id="video-ratio">16:9</span></span>
+                                    <span><i class="fas fa-microchip"></i> <span id="video-model">Veo 3.1</span></span>
                                 </div>
                             </div>
                         </div>
@@ -269,7 +288,7 @@
                         <i class="fas fa-bolt"></i>
                     </div>
                     <h3>Lightning Fast</h3>
-                    <p>Generate videos in 30-60 seconds with optimized AI technology, 3x faster than other platforms.</p>
+                    <p>Powered by Google Veo 3.1 through the Gemini API, with a Fast model for quicker drafts.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -277,7 +296,7 @@
                         <i class="fas fa-eye"></i>
                     </div>
                     <h3>4K Quality</h3>
-                    <p>Videos created with up to 4K resolution, sharp images, smooth motion, and realistic visuals.</p>
+                    <p>Generate 720p, 1080p or 4K videos with natively generated audio, sharp detail and smooth motion.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -285,7 +304,7 @@
                         <i class="fas fa-language"></i>
                     </div>
                     <h3>Multi-Language Support</h3>
-                    <p>Understand and create videos from descriptions in English, Vietnamese, Chinese, Japanese, and 20+ languages.</p>
+                    <p>Write prompts in English for best results; other languages such as Vietnamese also work with varying quality.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -293,7 +312,7 @@
                         <i class="fas fa-sliders-h"></i>
                     </div>
                     <h3>Advanced Customization</h3>
-                    <p>Detailed control over style, aspect ratio, camera movement, and background music.</p>
+                    <p>Control style, length, aspect ratio and resolution, or animate your own starting image.</p>
                 </div>
             </div>
         </div>
@@ -320,7 +339,7 @@
                     <div class="step-number">2</div>
                     <div class="step-content">
                         <h3>AI Analysis</h3>
-                        <p>Stark AI analyzes context, objects, actions, and setting from your description.</p>
+                        <p>Your prompt and settings are sent securely to Google Veo through the Gemini API.</p>
                     </div>
                 </div>
                 
@@ -328,7 +347,7 @@
                     <div class="step-number">3</div>
                     <div class="step-content">
                         <h3>Create Images & Motion</h3>
-                        <p>AI generates high-quality images and applies natural motion to each frame.</p>
+                        <p>Veo generates the video with motion and sound. This takes about 1–6 minutes.</p>
                     </div>
                 </div>
                 
@@ -336,7 +355,7 @@
                     <div class="step-number">4</div>
                     <div class="step-content">
                         <h3>Finalize Video</h3>
-                        <p>Add effects, sound, color grading, and export high-quality video ready for use.</p>
+                        <p>Watch, download or share your MP4. Google keeps it for 2 days, so save it.</p>
                     </div>
                 </div>
             </div>
@@ -348,11 +367,11 @@
         <div class="container">
             <div class="cta-content">
                 <h2>Ready to Create Professional AI Videos?</h2>
-                <p>Sign up now to get 5 free videos monthly and experience the most advanced AI technology.</p>
+                <p>Add your Gemini API key and turn your ideas into video with Google Veo.</p>
                 <button class="btn btn-cta" id="signup-btn">
                     <i class="fas fa-rocket"></i> Start Free Trial
                 </button>
-                <p class="cta-note">No credit card required. Cancel anytime.</p>
+                <p class="cta-note">Veo usage is billed by Google to your Gemini API account.</p>
             </div>
         </div>
     </section>
@@ -405,7 +424,7 @@
             </div>
             
             <div class="footer-bottom">
-                <p>&copy; 2023 Stark Video AI. All rights reserved.</p>
+                <p>&copy; <span id="year">2026</span> Stark Video AI. All rights reserved.</p>
                 <div class="footer-stats">
                     <span id="visit-count"><i class="fas fa-users"></i> 12,458 active users</span>
                     <span id="current-time"><i class="fas fa-clock"></i> Loading time...</span>
@@ -418,7 +437,7 @@
     <div class="modal" id="video-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Video Generated by Stark AI</h3>
+                <h3>Video Generated by Google Veo</h3>
                 <button class="close-modal" id="close-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -441,39 +460,40 @@
                 <div class="settings-form">
                     <div class="form-group">
                         <label for="api-key">
-                            <i class="fas fa-key"></i> ThankYou AI API Key
+                            <i class="fas fa-key"></i> Google Gemini API Key
                         </label>
                         <input
                             type="password"
                             id="api-key"
                             class="settings-input"
-                            placeholder="Enter your API key"
+                            placeholder="AIza..."
+                            autocomplete="off"
                         />
                         <p class="settings-help">
-                            Get your free API key from <a href="https://thankyouai.com" target="_blank">thankyouai.com</a>
+                            Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved only in this browser.
                         </p>
                     </div>
                     <div class="form-group">
-                        <label>
-                            <i class="fas fa-info-circle"></i> Model Selection
+                        <label for="model-select">
+                            <i class="fas fa-microchip"></i> Veo Model
                         </label>
                         <select id="model-select" class="settings-select">
-                            <option value="kling-v3">Kling v3 (Standard)</option>
-                            <option value="kling-v3-pro">Kling v3 Pro (Higher Quality)</option>
-                            <option value="kling-o1">Kling O1</option>
+                            <option value="veo-3.1-generate-preview">Veo 3.1 (best quality)</option>
+                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast (quicker, cheaper)</option>
+                            <option value="veo-3.1-lite-generate-preview">Veo 3.1 Lite (cheapest, no 4K)</option>
                         </select>
                     </div>
 
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="demo-mode" style="width: auto;">
-                            <span>Demo Mode (Use placeholder videos, no credits needed)</span>
+                            <span>Demo Mode (sample videos, no API calls)</span>
                         </label>
                     </div>
 
                     <div class="credit-info">
                         <i class="fas fa-info-circle"></i>
-                        <span>Video generation requires 60-90 credits. Check your balance at <a href="https://thankyouai.com/dashboard" target="_blank">thankyouai.com/dashboard</a></span>
+                        <span>Veo needs a Gemini API project with billing enabled and is charged per second of video. See <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">Gemini API pricing</a>.</span>
                     </div>
                     <button class="btn btn-primary btn-save-settings" id="save-settings-btn">
                         <i class="fas fa-save"></i> Save Settings
