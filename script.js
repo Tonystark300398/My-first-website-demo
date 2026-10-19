@@ -1,18 +1,24 @@
-// Stark Video AI - Google Gemini API (Veo) video generation
-// Docs: https://ai.google.dev/gemini-api/docs/veo
+// Stark Video AI
+// Engines:
+//   - "free": LTX-Video on Hugging Face Spaces (Lightricks/ltx-video-distilled) via @gradio/client
+//   - Google Veo 3.1 through the Gemini API (paid key): https://ai.google.dev/gemini-api/docs/veo
 document.addEventListener('DOMContentLoaded', () => {
     'use strict';
 
     // ==================== CONFIG ====================
     const API_CONFIG = {
         BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-        API_KEY: '',                               // Set via Settings (saved in localStorage)
-        MODEL: 'veo-3.1-generate-preview',
+        API_KEY: '',                               // Gemini key, set via Settings (saved in localStorage)
+        HF_TOKEN: '',                              // Optional Hugging Face token for more free GPU time
+        ENGINE: 'free',                            // 'free' or a Veo model id
+        HF_SPACE: 'Lightricks/ltx-video-distilled',
+        GRADIO_CLIENT_URL: 'https://cdn.jsdelivr.net/npm/@gradio/client@2.5.0/dist/index.min.js',
         POLL_INTERVAL: 10000,                      // Google recommends polling every ~10s
         MAX_WAIT_MS: 12 * 60 * 1000                // Give up after 12 minutes
     };
 
     const MODEL_NAMES = {
+        free: 'LTX-Video (free)',
         'veo-3.1-generate-preview': 'Veo 3.1',
         'veo-3.1-fast-generate-preview': 'Veo 3.1 Fast',
         'veo-3.1-lite-generate-preview': 'Veo 3.1 Lite'
@@ -26,6 +32,15 @@ document.addEventListener('DOMContentLoaded', () => {
         artistic: 'Painterly artistic style, expressive brush textures, rich colors.',
         cartoon: '2D cartoon style, bold outlines, bright playful colors.'
     };
+
+    // Durations offered per engine
+    const DURATIONS = {
+        free: [['2', '2 seconds'], ['3', '3 seconds'], ['4', '4 seconds'], ['5', '5 seconds']],
+        veo: [['4', '4 seconds'], ['6', '6 seconds'], ['8', '8 seconds']]
+    };
+
+    // Frame sizes for the free engine (multiples of 32)
+    const FREE_SIZES = { '16:9': [704, 480], '9:16': [480, 704] };
 
     const DEMO_VIDEOS = [
         'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
@@ -54,6 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
         length: $('video-length'),
         aspect: $('aspect-ratio'),
         resolution: $('video-resolution'),
+        resolutionGroup: $('resolution-group'),
+        engineSelect: $('engine-select'),
+        hfTokenInput: $('hf-token'),
+        hfSettings: $('hf-settings'),
+        veoSettings: $('veo-settings'),
+        progressTitle: $('progress-title'),
         startImageInput: $('start-image'),
         imageUploadText: $('image-upload-text'),
         imagePreview: $('image-preview'),
@@ -72,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsModal: $('settings-modal'),
         closeSettingsModal: $('close-settings-modal'),
         apiKeyInput: $('api-key'),
-        modelSelect: $('model-select'),
+
         demoModeCheckbox: $('demo-mode'),
         demoModeIndicator: $('demo-mode-indicator'),
         setupGuide: $('setup-guide'),
@@ -99,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSettings();
         bindEvents();
         updateCharCounter();
-        enforceResolutionRules();
+        applyEngineUI();
         checkApiKeyStatus();
         startClock();
         if (el.year) el.year.textContent = new Date().getFullYear();
@@ -125,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el.closeSettingsModal?.addEventListener('click', closeSettingsModal);
         el.saveSettingsBtn?.addEventListener('click', saveSettings);
         el.settingsModal?.addEventListener('click', (e) => { if (e.target === el.settingsModal) closeSettingsModal(); });
-        el.modelSelect?.addEventListener('change', enforceResolutionRules);
+        el.engineSelect?.addEventListener('change', updateSettingsVisibility);
 
         // Navigation / CTAs
         el.mobileMenuBtn?.addEventListener('click', () => el.mobileMenu?.classList.toggle('active'));
@@ -158,8 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (!state.demoMode && !API_CONFIG.API_KEY) {
-            notify('Add your Gemini API key in Settings, or turn on Demo Mode.', 'error');
+        if (!state.demoMode && isVeo() && !API_CONFIG.API_KEY) {
+            notify('Google Veo needs a Gemini API key. Add it in Settings or switch to the free engine.', 'error');
             openSettingsModal();
             return;
         }
@@ -173,8 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let result;
             if (state.demoMode) {
                 result = await runDemo(form, state.abort.signal);
-            } else {
+            } else if (isVeo()) {
                 result = await generateWithVeo(form, state.abort.signal);
+            } else {
+                result = await generateWithHF(form, state.abort.signal);
             }
             showSuccessUI(form, result);
             notify('Video generated successfully!', 'success');
@@ -203,15 +226,37 @@ document.addEventListener('DOMContentLoaded', () => {
             duration: el.length?.value || '8',
             aspectRatio: el.aspect?.value || '16:9',
             resolution: el.resolution?.value || '720p',
-            model: el.modelSelect?.value || API_CONFIG.MODEL,
+            model: API_CONFIG.ENGINE,
             image: state.startImage
         };
     }
 
+    function isVeo() {
+        return API_CONFIG.ENGINE !== 'free';
+    }
+
+    // Rebuild the length options and show/hide Veo-only controls for the current engine
+    function applyEngineUI() {
+        if (el.length) {
+            const prev = el.length.value;
+            const list = isVeo() ? DURATIONS.veo : DURATIONS.free;
+            el.length.innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+            el.length.value = list.some(([v]) => v === prev) ? prev : (isVeo() ? '8' : '3');
+        }
+        if (el.resolutionGroup) el.resolutionGroup.style.display = isVeo() ? '' : 'none';
+        if (el.generateBtn && !state.isGenerating) setGenerating(false);
+        enforceResolutionRules();
+    }
+
+    function updateSettingsVisibility() {
+        const veo = (el.engineSelect?.value || 'free') !== 'free';
+        if (el.veoSettings) el.veoSettings.style.display = veo ? '' : 'none';
+    }
+
     // Veo rules: 1080p and 4K require 8s; Lite has no 4K.
     function enforceResolutionRules() {
-        if (!el.resolution || !el.length) return;
-        const isLite = (el.modelSelect?.value || '').includes('lite');
+        if (!el.resolution || !el.length || !isVeo()) return;
+        const isLite = API_CONFIG.ENGINE.includes('lite');
         const fourK = el.resolution.querySelector('option[value="4k"]');
         if (fourK) {
             fourK.disabled = isLite;
@@ -303,6 +348,121 @@ document.addEventListener('DOMContentLoaded', () => {
         return { blob, url: URL.createObjectURL(blob), remoteUri: uri };
     }
 
+    // ==================== FREE ENGINE: LTX-Video on Hugging Face ====================
+    async function generateWithHF(form, signal) {
+        setStep(0, 3);
+        setNote('Connecting to the free AI server on Hugging Face…');
+        const { Client, handle_file } = await import(API_CONFIG.GRADIO_CLIENT_URL);
+
+        let client;
+        try {
+            client = await Client.connect(API_CONFIG.HF_SPACE, API_CONFIG.HF_TOKEN ? { token: API_CONFIG.HF_TOKEN } : {});
+        } catch (err) {
+            throw new Error(`Could not reach the free video server (${err.message || err}). It may be sleeping or busy; try again in a minute.`);
+        }
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        const [width, height] = FREE_SIZES[form.aspectRatio] || FREE_SIZES['16:9'];
+        const useImage = !!form.image;
+        const imageArg = useImage ? handle_file(dataUrlToBlob(form.image.dataUrl)) : null;
+
+        // Order matches generate() in the Space's app.py
+        const payload = [
+            form.prompt,                                            // prompt
+            'worst quality, inconsistent motion, blurry, jittery, distorted', // negative prompt
+            imageArg,                                               // input image
+            null,                                                   // input video
+            height,                                                 // height
+            width,                                                  // width
+            useImage ? 'image-to-video' : 'text-to-video',          // mode
+            Number(form.duration),                                  // duration (seconds)
+            9,                                                      // frames to use (video-to-video only)
+            42,                                                     // seed
+            true,                                                   // randomize seed
+            1,                                                      // guidance scale
+            true                                                    // improve texture
+        ];
+
+        const job = client.submit(useImage ? '/image_to_video' : '/text_to_video', payload);
+        const onAbort = () => { try { job.cancel(); } catch { /* ignore */ } };
+        signal.addEventListener('abort', onAbort, { once: true });
+
+        let output = null;
+        try {
+            for await (const msg of job) {
+                if (signal.aborted) break;
+                if (msg.type === 'status') {
+                    if (msg.stage === 'error') {
+                        throw new Error(friendlyHFError(msg.message));
+                    }
+                    if (msg.stage === 'pending' && msg.queue && msg.position != null) {
+                        setStep(0, 8);
+                        setNote(`Waiting in the free queue: position ${msg.position + 1}${msg.eta ? `, about ${Math.ceil(msg.eta)}s` : ''}…`);
+                    } else if (msg.stage === 'generating' || (msg.stage === 'pending' && !msg.queue)) {
+                        if (!state.progressTimer) {
+                            setStep(1, 15);
+                            setNote('Generating your video on a free GPU. This usually takes 20–90 seconds.');
+                            startFakeProgress(15, 88, 60000);
+                        }
+                    }
+                } else if (msg.type === 'data') {
+                    output = msg.data;
+                    break;
+                }
+            }
+        } finally {
+            signal.removeEventListener('abort', onAbort);
+        }
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        const videoUrl = extractVideoUrl(output?.[0]);
+        if (!videoUrl) throw new Error('The free server finished but returned no video. Please try again.');
+
+        stopFakeProgress();
+        setStep(2, 92);
+        setNote('Downloading your video…');
+        try {
+            const res = await fetch(videoUrl, { signal });
+            if (!res.ok) throw new Error(String(res.status));
+            const blob = await res.blob();
+            setStep(3, 100);
+            return { blob, url: URL.createObjectURL(blob), remoteUri: videoUrl };
+        } catch (err) {
+            if (err.name === 'AbortError') throw err;
+            // Fall back to streaming straight from Hugging Face
+            setStep(3, 100);
+            return { blob: null, url: videoUrl, remoteUri: videoUrl };
+        }
+    }
+
+    function extractVideoUrl(v) {
+        if (!v) return null;
+        if (typeof v === 'string') return v;
+        if (v.video) return extractVideoUrl(v.video);
+        return v.url || (v.path ? `https://${API_CONFIG.HF_SPACE.replace('/', '-').replace(/\./g, '-').toLowerCase()}.hf.space/gradio_api/file=${v.path}` : null);
+    }
+
+    function friendlyHFError(message) {
+        const m = String(message || '');
+        if (/quota|exceeded|ZeroGPU|GPU.*limit/i.test(m)) {
+            return 'You have used up the free GPU time for now. Wait a while, or add a free Hugging Face token in Settings for more free usage.';
+        }
+        return m ? `Free server error: ${m}` : 'The free video server returned an error. Please try again.';
+    }
+
+    function dataUrlToBlob(dataUrl) {
+        const [head, b64] = dataUrl.split(',');
+        const mime = head.match(/:(.*?);/)[1];
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new Blob([arr], { type: mime });
+    }
+
+    function setNote(text) {
+        if (el.progressNote) el.progressNote.textContent = text;
+    }
+
     async function downloadVeoVideo(uri, signal) {
         // Pass the key as a query param so the request stays "simple" (no CORS preflight)
         const keyed = uri + (uri.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(API_CONFIG.API_KEY);
@@ -362,10 +522,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el.videoResult) el.videoResult.style.display = 'none';
         if (el.outputPlaceholder) el.outputPlaceholder.style.display = 'none';
         if (el.progressContainer) el.progressContainer.style.display = 'block';
-        if (el.progressNote) {
-            el.progressNote.textContent = state.demoMode
-                ? 'Demo Mode: showing a sample video, no API call is made.'
-                : 'Veo usually takes 1–6 minutes. Keep this tab open. Click the button again to cancel.';
+        setNote(state.demoMode
+            ? 'Demo Mode: showing a sample video, no AI call is made.'
+            : isVeo()
+                ? 'Veo usually takes 1–6 minutes. Keep this tab open. Click the button again to cancel.'
+                : 'Connecting to the free AI server… Click the button again to cancel.');
+        if (el.progressTitle) {
+            el.progressTitle.textContent = state.demoMode ? 'Demo video' : `Generating with ${MODEL_NAMES[API_CONFIG.ENGINE] || 'AI'}`;
         }
         setStep(0, 0);
 
@@ -384,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el.generateBtn.classList.toggle('is-cancel', on);
         el.generateBtn.innerHTML = on
             ? '<i class="fas fa-spinner fa-spin"></i> Generating… (click to cancel)'
-            : '<i class="fas fa-bolt"></i> Generate Video with Veo';
+            : `<i class="fas fa-bolt"></i> Generate Video${isVeo() ? ' with Veo' : ' (Free)'}`;
     }
 
     function showSuccessUI(form, result) {
@@ -405,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('video-title', form.userPrompt.length > 70 ? form.userPrompt.slice(0, 70) + '…' : form.userPrompt);
         setText('video-duration', `${form.duration}s`);
         setText('video-style-result', el.style?.selectedOptions[0]?.textContent || form.style);
-        setText('video-ratio', `${form.aspectRatio} · ${form.resolution}`);
+        setText('video-ratio', isVeo() && !state.demoMode ? `${form.aspectRatio} · ${form.resolution}` : form.aspectRatio);
         setText('video-model', state.demoMode ? 'Demo' : (MODEL_NAMES[form.model] || form.model));
 
         if (el.downloadBtn) el.downloadBtn.disabled = false;
@@ -487,6 +650,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
+            if (navigator.clipboard && /^https?:/.test(state.currentVideoUrl)) {
+                await navigator.clipboard.writeText(state.currentVideoUrl);
+                notify('Video link copied to clipboard.', 'success');
+                return;
+            }
             notify('Your browser can\'t share video files directly. Download it and share the file instead.', 'info');
         } catch (err) {
             if (err.name !== 'AbortError') notify('Sharing failed.', 'error');
@@ -497,34 +665,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadSettings() {
         try {
             API_CONFIG.API_KEY = localStorage.getItem('stark_gemini_api_key') || API_CONFIG.API_KEY;
-            const model = localStorage.getItem('stark_veo_model');
+            API_CONFIG.HF_TOKEN = localStorage.getItem('stark_hf_token') || API_CONFIG.HF_TOKEN;
+            const engine = localStorage.getItem('stark_engine');
+            if (engine && MODEL_NAMES[engine]) API_CONFIG.ENGINE = engine;
             state.demoMode = localStorage.getItem('stark_demo_mode') === 'true';
-            if (model && el.modelSelect && MODEL_NAMES[model]) el.modelSelect.value = model;
         } catch { /* storage unavailable */ }
         if (el.apiKeyInput) el.apiKeyInput.value = API_CONFIG.API_KEY;
+        if (el.hfTokenInput) el.hfTokenInput.value = API_CONFIG.HF_TOKEN;
+        if (el.engineSelect) el.engineSelect.value = API_CONFIG.ENGINE;
         if (el.demoModeCheckbox) el.demoModeCheckbox.checked = state.demoMode;
+        updateSettingsVisibility();
         updateDemoModeIndicator();
     }
 
     function saveSettings() {
-        const key = el.apiKeyInput?.value.trim() || '';
-        API_CONFIG.API_KEY = key;
+        API_CONFIG.API_KEY = el.apiKeyInput?.value.trim() || '';
+        API_CONFIG.HF_TOKEN = el.hfTokenInput?.value.trim() || '';
+        API_CONFIG.ENGINE = el.engineSelect?.value || 'free';
         state.demoMode = !!el.demoModeCheckbox?.checked;
         try {
-            if (key) localStorage.setItem('stark_gemini_api_key', key);
-            else localStorage.removeItem('stark_gemini_api_key');
-            localStorage.setItem('stark_veo_model', el.modelSelect?.value || API_CONFIG.MODEL);
+            const put = (k, v) => v ? localStorage.setItem(k, v) : localStorage.removeItem(k);
+            put('stark_gemini_api_key', API_CONFIG.API_KEY);
+            put('stark_hf_token', API_CONFIG.HF_TOKEN);
+            localStorage.setItem('stark_engine', API_CONFIG.ENGINE);
             localStorage.setItem('stark_demo_mode', String(state.demoMode));
         } catch { /* storage unavailable */ }
+        if (isVeo() && !API_CONFIG.API_KEY && !state.demoMode) {
+            notify('Google Veo needs a Gemini API key with billing enabled.', 'warning');
+        } else {
+            notify('Settings saved.', 'success');
+        }
         updateDemoModeIndicator();
         checkApiKeyStatus();
-        enforceResolutionRules();
+        applyEngineUI();
         closeSettingsModal();
-        notify('Settings saved.', 'success');
     }
 
     function checkApiKeyStatus() {
-        const missing = !API_CONFIG.API_KEY && !state.demoMode;
+        const missing = isVeo() && !API_CONFIG.API_KEY && !state.demoMode;
         if (el.apiNotice) el.apiNotice.style.display = 'none';
         el.setupGuide?.classList.toggle('active', missing);
     }

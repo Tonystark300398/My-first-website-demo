@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stark Video AI - AI Video Generation with Google Veo</title>
+    <title>Stark Video AI - Free AI Video Generation</title>
     <meta name="description" content="Create high-quality AI videos with Stark's advanced technology. Convert text to video in seconds.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -35,7 +35,7 @@
                     <i class="fas fa-play-circle"></i> Demo Mode
                 </div>
                 <button class="btn btn-outline" id="settings-btn" title="Click to add API key or enable Demo Mode">
-                    <i class="fas fa-cog"></i> Settings <span class="settings-hint">(API Key)</span>
+                    <i class="fas fa-cog"></i> Settings <span class="settings-hint">(Engine)</span>
                 </button>
                 <button class="btn btn-primary" id="try-free-btn">
                     <i class="fas fa-play-circle"></i> Try For Free
@@ -128,12 +128,8 @@
                         <div class="setup-guide-content">
                             <i class="fas fa-rocket"></i>
                             <div class="setup-guide-text">
-                                <h4>Quick Setup Required</h4>
-                                <p>To generate videos, you need either:</p>
-                                <ul>
-                                    <li><strong>Option 1:</strong> Add your Google Gemini API key in Settings (get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>)</li>
-                                    <li><strong>Option 2:</strong> Enable Demo Mode in Settings (no API key needed)</li>
-                                </ul>
+                                <h4>Choose an engine</h4>
+                                <p>The free engine (LTX-Video on Hugging Face) is ready to use, with no key needed. For Google Veo, add a paid Gemini API key in Settings.</p>
                                 <button class="btn btn-primary btn-sm" id="open-settings-btn">
                                     <i class="fas fa-cog"></i> Open Settings
                                 </button>
@@ -169,9 +165,7 @@
                         <div class="option-group">
                             <label for="video-length"><i class="fas fa-clock"></i> Video Length</label>
                             <select id="video-length" class="length-select">
-                                <option value="4">4 seconds</option>
-                                <option value="6">6 seconds</option>
-                                <option value="8" selected>8 seconds</option>
+                                <option value="3">3 seconds</option>
                             </select>
                         </div>
 
@@ -183,7 +177,7 @@
                             </select>
                         </div>
 
-                        <div class="option-group">
+                        <div class="option-group" id="resolution-group">
                             <label for="video-resolution"><i class="fas fa-tv"></i> Resolution</label>
                             <select id="video-resolution" class="style-select">
                                 <option value="720p">720p (fastest)</option>
@@ -206,7 +200,7 @@
                     </div>
 
                     <button class="btn btn-generate" id="generate-btn">
-                        <i class="fas fa-bolt"></i> Generate Video with Veo
+                        <i class="fas fa-bolt"></i> Generate Video
                     </button>
                     
                     <div class="disclaimer">
@@ -238,7 +232,7 @@
                         
                         <div class="generation-progress" id="progress-container">
                             <div class="progress-header">
-                                <h4>Generating with Google Veo <span class="progress-elapsed" id="progress-elapsed">0:00</span></h4>
+                                <h4><span id="progress-title">Generating video</span> <span class="progress-elapsed" id="progress-elapsed">0:00</span></h4>
                                 <div class="progress-percent" id="progress-percent">0%</div>
                             </div>
                             <div class="progress-bar">
@@ -246,11 +240,11 @@
                             </div>
                             <div class="progress-steps">
                                 <div class="step active"><i class="fas fa-paper-plane"></i> Sending Request</div>
-                                <div class="step"><i class="fas fa-brain"></i> Veo Generating Video</div>
+                                <div class="step"><i class="fas fa-brain"></i> AI Generating Video</div>
                                 <div class="step"><i class="fas fa-cloud-download-alt"></i> Downloading Video</div>
                                 <div class="step"><i class="fas fa-check-circle"></i> Ready to Play</div>
                             </div>
-                            <p class="progress-note" id="progress-note">Veo usually takes 1–6 minutes. Keep this tab open.</p>
+                            <p class="progress-note" id="progress-note">Keep this tab open.</p>
                         </div>
                         
                         <div class="video-result" id="video-result">
@@ -264,7 +258,7 @@
                                     <span><i class="fas fa-clock"></i> <span id="video-duration">8s</span></span>
                                     <span><i class="fas fa-palette"></i> <span id="video-style-result">Realistic</span></span>
                                     <span><i class="fas fa-expand"></i> <span id="video-ratio">16:9</span></span>
-                                    <span><i class="fas fa-microchip"></i> <span id="video-model">Veo 3.1</span></span>
+                                    <span><i class="fas fa-microchip"></i> <span id="video-model">LTX-Video</span></span>
                                 </div>
                             </div>
                         </div>
@@ -288,7 +282,7 @@
                         <i class="fas fa-bolt"></i>
                     </div>
                     <h3>Lightning Fast</h3>
-                    <p>Powered by Google Veo 3.1 through the Gemini API, with a Fast model for quicker drafts.</p>
+                    <p>Free text-to-video with LTX-Video on Hugging Face, or premium quality with Google Veo 3.1.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -296,7 +290,7 @@
                         <i class="fas fa-eye"></i>
                     </div>
                     <h3>4K Quality</h3>
-                    <p>Generate 720p, 1080p or 4K videos with natively generated audio, sharp detail and smooth motion.</p>
+                    <p>Free clips in seconds, or up to 4K with native audio when you use Google Veo.</p>
                 </div>
                 
                 <div class="feature-card">
@@ -339,7 +333,7 @@
                     <div class="step-number">2</div>
                     <div class="step-content">
                         <h3>AI Analysis</h3>
-                        <p>Your prompt and settings are sent securely to Google Veo through the Gemini API.</p>
+                        <p>Your prompt goes to the free LTX-Video model on Hugging Face, or to Google Veo if you choose it.</p>
                     </div>
                 </div>
                 
@@ -347,7 +341,7 @@
                     <div class="step-number">3</div>
                     <div class="step-content">
                         <h3>Create Images & Motion</h3>
-                        <p>Veo generates the video with motion and sound. This takes about 1–6 minutes.</p>
+                        <p>The AI generates the frames and motion. Free videos usually take under a minute plus any queue.</p>
                     </div>
                 </div>
                 
@@ -355,7 +349,7 @@
                     <div class="step-number">4</div>
                     <div class="step-content">
                         <h3>Finalize Video</h3>
-                        <p>Watch, download or share your MP4. Google keeps it for 2 days, so save it.</p>
+                        <p>Watch, download or share your MP4 right away.</p>
                     </div>
                 </div>
             </div>
@@ -367,11 +361,11 @@
         <div class="container">
             <div class="cta-content">
                 <h2>Ready to Create Professional AI Videos?</h2>
-                <p>Add your Gemini API key and turn your ideas into video with Google Veo.</p>
+                <p>Type a prompt and make your first AI video for free, no sign-up required.</p>
                 <button class="btn btn-cta" id="signup-btn">
                     <i class="fas fa-rocket"></i> Start Free Trial
                 </button>
-                <p class="cta-note">Veo usage is billed by Google to your Gemini API account.</p>
+                <p class="cta-note">Free engine powered by LTX-Video on Hugging Face.</p>
             </div>
         </div>
     </section>
@@ -437,7 +431,7 @@
     <div class="modal" id="video-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Video Generated by Google Veo</h3>
+                <h3>Video Generated by Stark AI</h3>
                 <button class="close-modal" id="close-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -459,41 +453,47 @@
             <div class="modal-body">
                 <div class="settings-form">
                     <div class="form-group">
+                        <label for="engine-select">
+                            <i class="fas fa-microchip"></i> Video Engine
+                        </label>
+                        <select id="engine-select" class="settings-select">
+                            <option value="free">LTX-Video on Hugging Face (free)</option>
+                            <option value="veo-3.1-lite-generate-preview">Google Veo 3.1 Lite (paid)</option>
+                            <option value="veo-3.1-fast-generate-preview">Google Veo 3.1 Fast (paid)</option>
+                            <option value="veo-3.1-generate-preview">Google Veo 3.1 (paid, best quality)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="hf-settings">
+                        <label for="hf-token">
+                            <i class="fas fa-key"></i> Hugging Face Token <span class="optional-tag">(optional)</span>
+                        </label>
+                        <input type="password" id="hf-token" class="settings-input" placeholder="hf_..." autocomplete="off" />
+                        <p class="settings-help">
+                            Works without a token. If you hit the free GPU limit, create a free account and token at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> ("Read" access) for more free usage.
+                        </p>
+                    </div>
+
+                    <div class="form-group" id="veo-settings">
                         <label for="api-key">
                             <i class="fas fa-key"></i> Google Gemini API Key
                         </label>
-                        <input
-                            type="password"
-                            id="api-key"
-                            class="settings-input"
-                            placeholder="AIza..."
-                            autocomplete="off"
-                        />
+                        <input type="password" id="api-key" class="settings-input" placeholder="AIza..." autocomplete="off" />
                         <p class="settings-help">
-                            Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved only in this browser.
+                            Veo needs a key with billing enabled, from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
                         </p>
-                    </div>
-                    <div class="form-group">
-                        <label for="model-select">
-                            <i class="fas fa-microchip"></i> Veo Model
-                        </label>
-                        <select id="model-select" class="settings-select">
-                            <option value="veo-3.1-generate-preview">Veo 3.1 (best quality)</option>
-                            <option value="veo-3.1-fast-generate-preview">Veo 3.1 Fast (quicker, cheaper)</option>
-                            <option value="veo-3.1-lite-generate-preview">Veo 3.1 Lite (cheapest, no 4K)</option>
-                        </select>
                     </div>
 
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="demo-mode" style="width: auto;">
-                            <span>Demo Mode (sample videos, no API calls)</span>
+                            <span>Demo Mode (sample videos, no AI calls)</span>
                         </label>
                     </div>
 
                     <div class="credit-info">
                         <i class="fas fa-info-circle"></i>
-                        <span>Veo needs a Gemini API project with billing enabled and is charged per second of video. See <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noopener">Gemini API pricing</a>.</span>
+                        <span>Keys are saved only in this browser. On a public site, anyone using your page uses your own key, so the free engine is the safest choice.</span>
                     </div>
                     <button class="btn btn-primary btn-save-settings" id="save-settings-btn">
                         <i class="fas fa-save"></i> Save Settings

@@ -1,6 +1,24 @@
-# Stark Video AI: Gemini API (Veo) Setup Guide
+# Stark Video AI: Setup Guide
 
-This website generates AI videos with **Google Veo 3.1** through the **Gemini API**.
+## Free engine (default): no key, no credit card
+
+The site uses **LTX-Video** by Lightricks, through its free demo server on Hugging Face
+(`Lightricks/ltx-video-distilled`). Just type a prompt and click **Generate Video (Free)**.
+
+- Videos are 2–5 seconds, 704×480 (16:9) or 480×704 (9:16), with no audio.
+- It usually takes 20–90 seconds, plus a wait if other people are in the queue.
+- Free GPU time is limited per visitor. If you see "used up the free GPU time", wait a while, or
+  create a free account at huggingface.co and paste a **Read** token from
+  https://huggingface.co/settings/tokens into **Settings → Hugging Face Token** for more free time.
+- You can add a starting image to animate a photo.
+- The code is in `generateWithHF()` in `script.js`. It uses the official `@gradio/client` library from a CDN.
+
+---
+
+## Optional: Google Veo (paid, best quality)
+
+In **Settings → Video Engine**, choose a Google Veo model and paste a Gemini API key.
+The key must be from a project with **billing enabled**; free-tier keys get a 429 "quota" error.
 
 ## 1. Get a Gemini API key
 
@@ -8,11 +26,11 @@ This website generates AI videos with **Google Veo 3.1** through the **Gemini AP
 2. Click **Create API key** and copy it (it starts with `AIza...`).
 3. **Turn on billing** for the key's Google Cloud project. Veo is a paid model; with a free-tier key, requests fail with a quota (429) error.
 
-## 2. Add the key to the website
+## 2. Add the key
 
 1. Open `index.html` in your browser (double-click it or use VS Code Live Server).
 2. Click **Settings** in the top bar.
-3. Paste your key, choose a model and click **Save Settings**.
+3. Choose a Veo engine, paste your key and click **Save Settings**.
 
 The key is stored only in your browser's `localStorage`.
 
