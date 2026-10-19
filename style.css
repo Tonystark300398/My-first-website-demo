@@ -602,7 +602,10 @@ select {
     border-color: var(--line);
 }
 .pill-button.ghost:hover { border-color: var(--ink-soft); filter: none; }
-.vf-error .pill-button { margin-top: 12px; }
+.vf-error-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.pill-button.ghost-dark { background: transparent; color: var(--screen-ink); border-color: rgba(233, 234, 243, 0.35); }
+.pill-button.ghost-dark:hover { border-color: rgba(233, 234, 243, 0.7); filter: none; }
+#token-btn:not([hidden]) + .ghost-dark { order: 1; }
 
 .output-bar {
     display: flex;
@@ -971,3 +974,4 @@ body.modal-open { overflow: hidden; }
     .segmented input:checked + span,
     .engine-option input:checked + span { outline: 2px solid CanvasText; }
 }
+#token-btn[hidden] + #retry-btn { background: var(--accent); color: var(--accent-ink); border-color: transparent; }

@@ -63,7 +63,7 @@
             'start-image', 'attach-text', 'attach-preview', 'attach-img', 'attach-remove',
             'generate-btn', 'generate-label', 'generate-hint',
             'viewfinder', 'rec-label', 'rec-time', 'vf-meta', 'status-text', 'status-detail',
-            'progress', 'progress-fill', 'cancel-btn', 'error-text', 'retry-btn', 'video',
+            'progress', 'progress-fill', 'cancel-btn', 'error-text', 'retry-btn', 'token-btn', 'video',
             'output-bar', 'output-caption', 'download-btn', 'share-btn', 'history-wrap', 'history',
             'settings-btn', 'engine-badge', 'settings', 'hf-token', 'api-key', 'demo-mode', 'demo-mode-footer',
             'hf-fields', 'veo-fields', 'save-settings-btn', 'toasts', 'year'
@@ -115,6 +115,10 @@
 
         el.cancelBtn.addEventListener('click', function () { if (state.abort) state.abort.abort(); });
         el.retryBtn.addEventListener('click', generate);
+        el.tokenBtn.addEventListener('click', function () {
+            openSettings();
+            setTimeout(function () { el.hfToken.focus(); }, 30);
+        });
         el.downloadBtn.addEventListener('click', download);
         el.shareBtn.addEventListener('click', share);
 
@@ -250,7 +254,7 @@
                 toast('Cancelled.', 'info');
             } else {
                 console.error(err);
-                showError((err && err.message) || 'Something went wrong. Try again.');
+                showError((err && err.message) || 'Something went wrong. Try again.', !!(err && err.quota) && !settings.hfToken);
             }
         }).then(function () {
             setBusy(false);
@@ -270,7 +274,9 @@
         var useImage = !!form.image;
 
         return import(CONFIG.GRADIO_CLIENT_URL).then(function (mod) {
-            return mod.Client.connect(CONFIG.HF_SPACE, settings.hfToken ? { token: settings.hfToken } : {})
+            return mod.Client.connect(CONFIG.HF_SPACE, settings.hfToken
+                ? { token: settings.hfToken, events: ['data', 'status'] }
+                : { events: ['data', 'status'] })   // 'status' is needed to see queue position and errors
                 .catch(function (e) {
                     throw new Error('Couldn\'t reach the free video server (' + ((e && e.message) || e) + '). It may be busy; try again in a minute.');
                 })
@@ -292,7 +298,7 @@
                 });
         }).then(function (data) {
             var url = extractVideoUrl(data && data[0]);
-            if (!url) throw new Error('The free server finished but sent no video. Try again.');
+            if (!url) throw quotaError('The free server stopped without sending a video. This usually means the free GPU time has run out.');
             stopProgress();
             setStatus('Downloading your video…', '', 94);
             return fetch(url, { signal: signal })
@@ -317,7 +323,7 @@
                 var msg = res.value;
                 if (msg.type === 'data') return msg.data;
                 if (msg.type === 'status') {
-                    if (msg.stage === 'error') throw new Error(friendlyHFError(msg.message));
+                    if (msg.stage === 'error') { var fe = friendlyHFError(msg.message); throw fe instanceof Error ? fe : new Error(fe); }
                     if (msg.stage === 'pending' && msg.queue && msg.position != null) {
                         setStatus('Waiting in line: you\'re number ' + (msg.position + 1),
                             msg.eta ? 'About ' + Math.ceil(msg.eta) + ' seconds to go.' : 'The free server is shared by everyone.', 8);
@@ -350,10 +356,18 @@
         return null;
     }
 
+    function quotaError(text) {
+        var err = new Error(text);
+        err.quota = true;
+        return err;
+    }
+
     function friendlyHFError(message) {
         var m = String(message || '');
         if (/quota|exceeded|ZeroGPU|GPU.*limit/i.test(m)) {
-            return 'You\'ve used your free GPU time for now. Wait a while, or add a free Hugging Face token in Settings for more.';
+            var wait = m.match(/Try again in ([0-9:]+)/);
+            var when = wait && wait[1] !== '0:00:00' ? ' Try again in ' + wait[1] + '.' : '';
+            return quotaError('Free GPU time has run out for your network.' + when + ' A free Hugging Face token gives you more.');
         }
         return m ? 'The free server reported: ' + m : 'The free server returned an error. Try again.';
     }
@@ -479,8 +493,9 @@
     function stopProgress() { clearInterval(state.progressTimer); state.progressTimer = null; }
     function stopTimers() { stopProgress(); clearInterval(state.clockTimer); state.clockTimer = null; }
 
-    function showError(message) {
+    function showError(message, offerToken) {
         el.errorText.textContent = message;
+        el.tokenBtn.hidden = !offerToken;
         setView('error');
         el.retryBtn.focus({ preventScroll: true });
     }

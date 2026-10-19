@@ -157,7 +157,10 @@
                     <div class="vf-layer vf-error">
                         <p class="vf-title">The video wasn't made</p>
                         <p class="vf-sub" id="error-text"></p>
-                        <button type="button" class="pill-button" id="retry-btn"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg>Try again</button>
+                        <div class="vf-error-actions">
+                            <button type="button" class="pill-button" id="token-btn" hidden>Add free token</button>
+                            <button type="button" class="pill-button ghost-dark" id="retry-btn"><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg>Try again</button>
+                        </div>
                     </div>
 
                     <video id="video" class="vf-video" controls playsinline loop preload="metadata"></video>
